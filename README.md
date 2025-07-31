@@ -1,36 +1,105 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🧠 Cognitiva - Web
 
-## Getting Started
+Aplicação web construída com **Next.js 15**, **React 19** e **Tailwind CSS**, voltada para a plataforma Cognitiva. Este documento contém os passos completos para clonar, instalar, executar e contribuir com o projeto.
 
-First, run the development server:
+---
+
+## ✅ Requisitos
+
+- **Node.js**: v20.9.0
+- **npm**: (instalado junto com o Node.js)
+
+---
+
+## 🛠️ Instalação do Node.js
+
+### Windows / Linux / macOS
+
+Instale a versão **20.9.0** do Node.js:
+
+```bash
+# Via nvm (recomendado)
+nvm install 20.9.0
+nvm use 20.9.0
+```
+
+Se ainda não tem o `nvm`:
+
+- [Instruções para instalar no Windows](https://github.com/coreybutler/nvm-windows)
+- [Instruções para instalar no Linux/macOS](https://github.com/nvm-sh/nvm)
+
+---
+
+## 📦 Clonando o projeto
+
+```bash
+git clone https://github.com/augustocarva1ho/Cognitiva.git
+cd Cognitiva
+```
+
+---
+
+## 🔧 Instalando as dependências
+
+```bash
+npm install next@15.3.2 react@19.0.0 react-dom@19.0.0 @eslint/eslintrc@^3 @types/node@^20 @types/react@^19 @types/react-dom@^19 @types/webpack@^5.28.5 autoprefixer@^10.4.21 eslint@^9 eslint-config-next@15.3.2 postcss@^8.5.3 tailwindcss@^3.4.17 typescript@^5 --save-dev
+```
+
+Ou, mais simples:
+
+```bash
+npm install
+```
+
+---
+
+## ▶️ Rodando localmente
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Acesse: [http://localhost:3000](http://localhost:3000)
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+---
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## 💾 Comandos Git
 
-## Learn More
+### Obter últimas alterações (pull)
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+git pull origin master
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### Adicionar, commitar e subir alterações
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+git add .
+git commit -m "mensagem do commit"
+git push origin master
+```
 
-## Deploy on Vercel
+---
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## 📁 Estrutura do Projeto (resumida)
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```
+/public              # Imagens e favicon
+/src
+  ├── app            # Páginas (Next.js App Router)
+  └── components     # Componentes reutilizáveis (Header, Footer etc.)
+tailwind.config.js   # Configuração do Tailwind CSS
+postcss.config.js    # Pós-processamento de CSS
+```
+
+---
+
+## 🧪 Scripts disponíveis
+
+```bash
+npm run dev      # Inicia o servidor de desenvolvimento
+npm run build    # Gera a versão de produção
+npm run start    # Inicia o servidor com o build gerado
+npm run lint     # Executa o lint
+```
+

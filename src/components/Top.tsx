@@ -1,4 +1,10 @@
+'use client';
+import { useState } from 'react';
+import LoginModal from './LoginModal';
+
 export default function Top() {
+  const [showLogin, setShowLogin] = useState(false);
+
   return (
     <header className="w-screen bg-green-300 h-20 text-zinc-50 font-bold flex items-center justify-between px-8">
 
@@ -14,9 +20,14 @@ export default function Top() {
       </nav>
 
       <div className="flex items-center gap-4">
-        <button className="bg-zinc-50 text-green-300 px-4 py-1 rounded hover:bg-green-100 transition">Login</button>
+        <button 
+          onClick={() => setShowLogin(true)} 
+          className="bg-zinc-50 text-green-300 px-4 py-1 rounded hover:bg-green-100 transition">
+          Login
+        </button>
         <div className="w-8 h-8 bg-gray-400 rounded-full"></div> {/* Imagem placeholder */}
       </div>
+       <LoginModal isOpen={showLogin} onClose={() => setShowLogin(false)} />
     </header>
   );
 }
