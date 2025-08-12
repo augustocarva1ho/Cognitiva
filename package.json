@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@lottiefiles/react-lottie-player": "^3.6.0",
+    "framer-motion": "^12.23.12",
     "lottie-react": "^2.4.1",
     "next": "15.3.2",
     "react": "^19.0.0",

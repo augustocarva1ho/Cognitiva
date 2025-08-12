@@ -8,6 +8,9 @@
   --foreground: #171717;
 }
 
+html {
+  scroll-behavior: smooth;
+}
 html,
 body {
   margin: 0;
@@ -18,3 +21,4 @@ body {
   color: var(--foreground);
   font-family: var(--font-geist-sans), sans-serif;
 }
+

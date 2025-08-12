@@ -42,7 +42,7 @@ cd Cognitiva
 ## 🔧 Instalando as dependências
 
 ```bash
-npm install next@15.3.2 react@19.0.0 react-dom@19.0.0 @eslint/eslintrc@^3 @types/node@^20 @types/react@^19 @types/react-dom@^19 @types/webpack@^5.28.5 autoprefixer@^10.4.21 eslint@^9 eslint-config-next@15.3.2 postcss@^8.5.3 tailwindcss@^3.4.17 typescript@^5 --save-dev
+npm install next@15.3.2 react@19.0.0 react-dom@19.0.0 @eslint/eslintrc@^3 @types/node@^20 @types/react@^19 @types/react-dom@^19 @types/webpack@^5.28.5 autoprefixer@^10.4.21 eslint@^9 eslint-config-next@15.3.2 postcss@^8.5.3 tailwindcss@^3.4.17 typescript@^5 framer-motion --save-dev
 ```
 
 Ou, mais simples:
