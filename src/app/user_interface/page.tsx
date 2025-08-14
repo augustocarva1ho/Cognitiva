@@ -4,6 +4,7 @@ import Top from "@/components/Top";
 import Bot from "@/components/Bot";
 import { JSX, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import ClassUI from "@/components/ClassUI";
 
 export default function UserInterface() {
   const [selected, setSelected] = useState<string>('Área da Turma');
@@ -15,15 +16,16 @@ export default function UserInterface() {
     'Comunicação',
   ];
   const contentMap: Record<string, JSX.Element> = {
-    "Área da Turma": <div>📚 Bem-vindo à Área da Turma</div>,
+    "Área da Turma": <ClassUI/>,
     "Gerar Insight": <div>💡 Ferramenta de Insights</div>,
     "Gerir Atividades": <div>📝 Gestão de Atividades</div>,
     "Comunicação": <div>💬 Painel de Comunicação</div>,
   };
-  return (    
-    <div className="pt-20 items-center justify-items-center min-h-screen pb-20 gap-16 font-[family-name:var(--font-geist-sans)]">
+  return (  
+    <div className="flex flex-col overflow-x-hidden min-h-screen">
+    <div className="pt-20 items-center justify-items-center gap-16 font-[family-name:var(--font-geist-sans)]">
       <Top/>
-      <div className="flex min-h-[calc(100vh-64px)] bg-zinc-50">
+      <div className="flex min-h-[calc(100vh)] bg-zinc-50">
         {/* Menu lateral */}
         <aside className="w-64 bg-white border-r border-zinc-200">
           <nav className="flex flex-col">
@@ -60,6 +62,7 @@ export default function UserInterface() {
           </AnimatePresence>
         </main>
       </div>
+    </div>  
       <Bot/>
     </div>
   );
