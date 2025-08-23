@@ -17,16 +17,25 @@ Aplicação web construída com **Next.js 15**, **React 19** e **Tailwind CSS**,
 
 Instale a versão **20.9.0** do Node.js:
 
+Se ainda não tem o `nvm`:
+
+- [Instruções para instalar no Windows](https://github.com/coreybutler/nvm-windows)
+- [Instruções para instalar no Linux/macOS](https://github.com/nvm-sh/nvm)
+# baixe e instale o arquivo nvm-setup.exe
+# reinicie o vscode
+Para testar se funcionou digite no terminal:
+
+```bash
+nvm -v
+```
+
+Então instale o Node.js:
+
 ```bash
 # Via nvm (recomendado)
 nvm install 20.9.0
 nvm use 20.9.0
 ```
-
-Se ainda não tem o `nvm`:
-
-- [Instruções para instalar no Windows](https://github.com/coreybutler/nvm-windows)
-- [Instruções para instalar no Linux/macOS](https://github.com/nvm-sh/nvm)
 
 ---
 
@@ -42,7 +51,7 @@ cd Cognitiva
 ## 🔧 Instalando as dependências
 
 ```bash
-npm install next@15.3.2 react@19.0.0 react-dom@19.0.0 @eslint/eslintrc@^3 @types/node@^20 @types/react@^19 @types/react-dom@^19 @types/webpack@^5.28.5 autoprefixer@^10.4.21 eslint@^9 eslint-config-next@15.3.2 postcss@^8.5.3 tailwindcss@^3.4.17 typescript@^5 framer-motion --save-dev
+npm install next@15.3.2 react@19.0.0 react-dom@19.0.0 @eslint/eslintrc@^3 @types/node@^20 @types/react@^19 @types/react-dom@^19 @types/webpack@^5.28.5 autoprefixer@^10.4.21 eslint@^9 eslint-config-next@15.3.2 postcss@^8.5.3 tailwindcss@^3.4.17 typescript@^5 framer-motion dlv --save-dev
 ```
 
 Ou, mais simples:

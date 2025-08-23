@@ -2,8 +2,18 @@
 import Image from "next/image";
 import Top from "../components/Top";
 import Bot from "@/components/Bot";
+import { useEffect, useState } from 'react'
 
 export default function Home() {
+  const [nomes, setNomes] = useState<string[]>([])
+
+  useEffect(() => {
+    fetch('/api/')
+      .then(res => res.json())
+      .then(data => setNomes(data.map((item: { Nome: string }) => item.Nome)))
+      .catch(console.error)
+  }, [])
+
   const scrollToSobreNos = () => {
     const element = document.getElementById("sobre-nos");
     if (element) {
@@ -18,6 +28,13 @@ export default function Home() {
             <div className="flex gap-3 items-baseline">
               <h1 className="text-4xl text-zinc-700 font-bold">Olá, Bem vindo à</h1>
               <h1 className="text-5xl text-green-300 font-bold">COGNITIVA</h1>
+              {/*TESTE DE CONSUMO DA API*/}
+              {/* <ul className="list-disc list-inside">
+                <p>nomes: </p>
+                {nomes.map((nome, idx) => (
+                  <li key={idx}>{nome}</li>
+                ))}
+              </ul> */}
             </div> 
             <div className="flex flex-col w-[560px] mt-4 gap-4 text-zinc-600 font-medium">           
               <p className="px-3 break-words whitespace-normal">A COGNITIVA é uma plataforma inteligente dedicada ao acompanhamento educacional de alunos neurodivergentes. Utilizando inteligência artificial, oferecemos análises personalizadas de desempenho academico e socioemocional, apoiando professores, gestores e famílias com insights precisos e recomendações ficazes. </p>
