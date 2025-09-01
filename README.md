@@ -59,7 +59,11 @@ Ou, mais simples:
 ```bash
 npm install
 ```
-
+Instale também o Prisma:
+```bash
+npm install @prisma/client
+npm install -D prisma
+```
 ---
 
 ## ▶️ Rodando localmente
