@@ -14,10 +14,55 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model Teste {
+model Acesso{
+  id String @id @default(uuid())
+  Nome String
+  docentes Docente[]
+}
+
+model Docente{
   id String @id @default(uuid())
   Nome String
   Email String?
-  CPF String @unique
+  Registo String
+  nivelAcesso String
+  acesso Acesso @relation(fields: [nivelAcesso], references: [id])
+}
+
+model Aluno{
+  id String @id @default(uuid())
+  Nome String
+  Matricula String
   Idade Int?
+  turmaId String
+  turma Turma @relation(fields: [turmaId], references: [id])
+  laudos Laudo[]
+}
+
+model Turma{
+  id String @id @default(uuid())
+  Nome String
+  Alunos Aluno[]
+}
+
+model Laudo {
+  id String @id @default(uuid())
+  alunoId String
+  aluno Aluno @relation(fields: [alunoId], references: [id])
+  neurodivergencias NeurodivergenciaOnLaudo[]
+}
+
+model Neurodivergencia {
+  id String @id @default(uuid())
+  nome String @unique
+  laudos  NeurodivergenciaOnLaudo[]
+}
+
+// Tabela pivô para relação N:N entre Laudo e Neurodivergencia
+model NeurodivergenciaOnLaudo {
+  laudoId String
+  neurodivergenciaId String
+  laudo Laudo           @relation(fields: [laudoId], references: [id])
+  neurodivergencia Neurodivergencia @relation(fields: [neurodivergenciaId], references: [id])
+  @@id([laudoId, neurodivergenciaId])
 }
