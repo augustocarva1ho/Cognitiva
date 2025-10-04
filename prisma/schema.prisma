@@ -1,9 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
   output   = "../src/generated/prisma"
@@ -14,55 +8,69 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model Acesso{
-  id String @id @default(uuid())
-  Nome String
-  docentes Docente[]
-}
-
-model Docente{
-  id String @id @default(uuid())
-  Nome String
+model Teste {
+  id    String  @id
+  Nome  String
   Email String?
-  Registo String
-  nivelAcesso String
-  acesso Acesso @relation(fields: [nivelAcesso], references: [id])
+  CPF   String
 }
 
-model Aluno{
-  id String @id @default(uuid())
-  Nome String
-  Matricula String
-  Idade Int?
-  turmaId String
-  turma Turma @relation(fields: [turmaId], references: [id])
-  laudos Laudo[]
+
+model Turma {
+  id      String   @id @default(uuid())
+  Nome    String
+  Alunos  Aluno[]
 }
 
-model Turma{
-  id String @id @default(uuid())
-  Nome String
-  Alunos Aluno[]
+model Aluno {
+  id        String   @id @default(uuid())
+  Nome      String
+  Matricula String   @unique
+  Idade     Int?
+  // Em vez de apenas Boolean, vamos modelar como um Laudo associado
+  turmaId   String
+  turma     Turma    @relation(fields: [turmaId], references: [id])
+  laudos    Laudo[]
 }
 
 model Laudo {
-  id String @id @default(uuid())
-  alunoId String
-  aluno Aluno @relation(fields: [alunoId], references: [id])
+  id          String             @id @default(uuid())
+  dataEmissao DateTime           @default(now())
+  alunoId     String
+  aluno       Aluno              @relation(fields: [alunoId], references: [id])
   neurodivergencias NeurodivergenciaOnLaudo[]
 }
 
 model Neurodivergencia {
-  id String @id @default(uuid())
-  nome String @unique
+  id      String                  @id @default(uuid())
+  nome    String                  @unique
   laudos  NeurodivergenciaOnLaudo[]
 }
 
 // Tabela pivô para relação N:N entre Laudo e Neurodivergencia
+
 model NeurodivergenciaOnLaudo {
-  laudoId String
+  laudoId           String
   neurodivergenciaId String
-  laudo Laudo           @relation(fields: [laudoId], references: [id])
-  neurodivergencia Neurodivergencia @relation(fields: [neurodivergenciaId], references: [id])
+
+  laudo             Laudo           @relation(fields: [laudoId], references: [id])
+  neurodivergencia  Neurodivergencia @relation(fields: [neurodivergenciaId], references: [id])
+
   @@id([laudoId, neurodivergenciaId])
 }
+
+model Acesso {
+  id     String   @id @default(uuid())
+  nome   String
+  docentes Docente[]  // Um nível de acesso pode ter vários docentes
+}
+
+model Docente {
+  id          String  @id @default(uuid())
+  nome        String
+  email       String?
+  registo     String
+  nivelAcesso String
+  acesso      Acesso  @relation(fields: [nivelAcesso], references: [id])
+}
+
