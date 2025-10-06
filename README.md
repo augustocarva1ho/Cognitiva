@@ -72,7 +72,7 @@ npm install -D prisma
 npm run dev
 ```
 
-Acesse: [http://localhost:3000](http://localhost:3000)
+Acesse: [](http://localhost:3000)
 
 ---
 
@@ -80,7 +80,7 @@ Acesse: [http://localhost:3000](http://localhost:3000)
 
 ### Obter últimas alterações (pull)
 
-```bash
+```bashhttp://localhost:3000
 git pull origin master
 ```
 
