@@ -34,20 +34,16 @@ export default function Top() {
   const professorAreaPath = "/user_interface";
 
   return (
-    // Estilo Original Restaurado (bg-green-300, h-20, px-8)
-    <div className="fixed top-0 left-0 w-screen bg-green-300 h-20 text-zinc-50 font-bold flex items-center justify-between px-8 z-40">
+    <div className="fixed top-0 left-0 w-screen bg-green-300 h-20 text-zinc-50 font-bold flex items-center justify-between px-8">
 
       <div className="text-lg flex gap-4 items-center px-8 py-4">
         <Link href="/" onClick={handleClick} className="flex items-center">
-          {/* Mantido o placeholder, já que não temos o ficheiro head-logo2.svg */}
-          <div className="w-12 ml-[-32px] mr-2 h-12 bg-white rounded-full flex items-center justify-center">
-             <span className="text-green-300 text-lg font-black">C</span>
-          </div>
+          <img src="./head-logo2.svg" className="w-12 ml-[-32px]" alt="Logo" />
           COGNITIVA
         </Link>
       </div>
       
-      {/* Links de Navegação (gap-20 original) */}
+      {/* Links de Navegação */}
       <nav className="flex gap-20 text-md">
         <Link href={pathname === "/" ? "#sobre-nos" : "/#sobre-nos"} scroll={true} className="hover:underline">Sobre nós</Link>
         <Link href={pathname === "/" ? "#noticias" : "/#noticias"} scroll={true} className="hover:underline">Notícias</Link>
@@ -57,7 +53,7 @@ export default function Top() {
         <Link 
           href={professorAreaPath} 
           onClick={(e) => handleLinkClick(e, professorAreaPath)}
-          className={`hover:underline ${!isLoggedIn ? 'opacity-50 cursor-not-allowed' : ''}`}
+          className={`hover:underline ${!isLoggedIn ? 'hidden' : ''}`}
         >
           Área do Professor
         </Link>
