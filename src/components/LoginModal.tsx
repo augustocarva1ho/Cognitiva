@@ -13,7 +13,7 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
   const { login, API_BASE_URL } = useAuth();
   const router = useRouter();
   
-  const [registo, setRegisto] = useState(''); // O seu backend espera 'registo' ou 'email'
+  const [registro, setRegistro] = useState(''); // O seu backend espera 'registro' ou 'email'
   const [senha, setSenha] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -23,7 +23,7 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden';
-      setRegisto('');
+      setRegistro('');
       setSenha('');
       setError(null);
     } else {
@@ -50,8 +50,8 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
         headers: {
           'Content-Type': 'application/json',
         },
-        // O seu backend espera { registo, senha }
-        body: JSON.stringify({ registo, senha }), 
+        // O seu backend espera { registro, senha }
+        body: JSON.stringify({ registro, senha }), 
       });
 
       const data = await response.json();
@@ -121,9 +121,9 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
           )}
           <input
             type="text"
-            value={registo}
-            onChange={(e) => setRegisto(e.target.value)}
-            placeholder="Registo / E-mail" // Corrigido para refletir o nome do campo
+            value={registro}
+            onChange={(e) => setRegistro(e.target.value)}
+            placeholder="Registro / E-mail" // Corrigido para refletir o nome do campo
             required
             className="p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-300 text-gray-500"
             disabled={loading}

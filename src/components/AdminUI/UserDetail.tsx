@@ -1,24 +1,20 @@
-'use client'
+'use client';
+import { useState, useEffect } from 'react';
+import { useAuth, Docente } from '@/context/AuthContext';
+import { useRouter } from 'next/navigation';
 
-import { useEffect, useState } from "react";
-import { useAuth } from "@/context/AuthContext";
-import { useRouter } from "next/navigation";
-
-// Define os tipos esperados pelo UsersManager (para feedback e navegação)
-interface UsersCreateProps {
-  onCreated: () => void;
+interface UserDetailProps {
+  docente: Docente;
+  onDone: () => void;
   onCancel: () => void;
 }
 
-// O tipo do formulário é uma parte da interface Docente
-interface FormData {
-  codigo: string;
+interface DocenteFormData {
   nome: string;
-  email: string;
-  // cpf: string;
-  senha: string;
-  // materia: string;
-  // turmas: string[];
+  email: string | null;
+  cpf: string;
+  materia: string;
+  turmas: string[];
   nivelAcesso: string;
 }
 
@@ -27,62 +23,54 @@ interface Acesso {
   nome: string;
 }
 
-export default function UsersCreate({ onCreated, onCancel }: UsersCreateProps) {
+export default function UserDetail({ docente, onDone, onCancel }: UserDetailProps) {
   const { API_BASE_URL, token } = useAuth();
-  const router = useRouter();
+  const [formData, setFormData] = useState<DocenteFormData>({
+    nome: docente.nome,
+    email: docente.email,
+    cpf: docente.cpf,
+    materia: docente.materia,
+    turmas: docente.turmas || [],
+    nivelAcesso: docente.acesso.id,
+  });
   const [acessos, setAcessos] = useState<Acesso[]>([]);
-  const [acessoId, setAcessoId] = useState('');
+  const [loading, setLoading] = useState(false);
   const [loadingAcessos, setLoadingAcessos] = useState(true);
+  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  const turmasPlaceholder = ["Turma A", "Turma B", "Turma C", "Turma D"];
 
   useEffect(() => {
     const fetchAcessos = async () => {
-        setLoadingAcessos(true);
-        if (!token) {
-          setLoadingAcessos(false);
-          return;
-        }
+      setLoadingAcessos(true);
+      if (!token) {
+        setLoadingAcessos(false);
+        return;
+      }
 
-        const url = `${API_BASE_URL}/api/docentes/acessos`;
+      const url = `${API_BASE_URL}/api/docentes/acessos`;
 
-        try {
-            const response = await fetch(url, {
-                headers: {
-                    Authorization: `Bearer ${token}`
-                }
-            });
-            if (!response.ok) {
-                throw new Error('Falha ao buscar níveis de acesso');
-            }
-            const data: Acesso[] = await response.json();
-            setAcessos(data);
-            if (data.length > 0) {
-                setFormData(prev => ({ ...prev, nivelAcesso: data[0].id }));
-            }
-        } catch (error) {
-            console.error('Erro ao buscar níveis de acesso:', error);
-            setMessage({ type: 'error', text: 'Não foi possível carregar os níveis de acesso.' });
-        } finally {
-            setLoadingAcessos(false);
+      try {
+        const response = await fetch(url, {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        });
+        if (!response.ok) {
+          throw new Error('Falha ao buscar níveis de acesso');
         }
+        const data: Acesso[] = await response.json();
+        setAcessos(data);
+      } catch (error) {
+        console.error('Erro ao buscar níveis de acesso:', error);
+        setMessage({ type: 'error', text: 'Não foi possível carregar os níveis de acesso.' });
+      } finally {
+        setLoadingAcessos(false);
+      }
     };
     fetchAcessos();
-}, [API_BASE_URL, token]);
-  
-  const [formData, setFormData] = useState<FormData>({
-    codigo: "",
-    nome: "",
-    email: "",
-    // cpf: "",
-    senha: "",
-    // materia: "",
-    // turmas: [],
-    nivelAcesso: "",
-  });
-  const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  }, [API_BASE_URL, token]);
 
-  // Placeholder para simular turmas
-  const turmasPlaceholder = ["Turma A", "Turma B", "Turma C", "Turma D"];
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -100,91 +88,91 @@ export default function UsersCreate({ onCreated, onCancel }: UsersCreateProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!token) {
-      setMessage({ type: 'error', text: 'Sessão expirada. Faça login novamente.' });
-      router.push('/');
+      setMessage({ type: 'error', text: 'Sessão expirada.' });
       return;
     }
     
     setLoading(true);
     setMessage(null);
 
-    const payload = {
-      registro: formData.codigo,
-      nome: formData.nome,
-      email: formData.email,
-      // cpf: formData.cpf,
-      senha: formData.senha,
-      // materia: formData.materia,
-      // turmas: formData.turmas, 
-      acessoId: formData.nivelAcesso, // Defina um valor de nível de acesso padrão para novos docentes
-    };
-    
     try {
-      const response = await fetch(`${API_BASE_URL}/api/docentes`, {
-        method: 'POST',
+      const response = await fetch(`${API_BASE_URL}/api/docentes/${docente.id}`, {
+        method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(formData),
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || `Erro de servidor: ${response.status}`);
+        throw new Error(errorData.error || `Falha ao atualizar docente: ${response.statusText}`);
       }
 
-      setMessage({ type: 'success', text: 'Docente cadastrado com sucesso!' });
-      
-      setFormData({
-        codigo: "", nome: "", email: "",  senha: "", nivelAcesso: acessos[0]?.id || ""
-      });
-      
-      setTimeout(onCreated, 1500); 
+      setMessage({ type: 'success', text: 'Docente atualizado com sucesso!' });
+      setTimeout(onDone, 1500); 
 
     } catch (err) {
-      const errorText = err instanceof Error ? err.message : 'Erro desconhecido ao cadastrar.';
+      const errorText = err instanceof Error ? err.message : 'Erro desconhecido ao atualizar.';
       setMessage({ type: 'error', text: errorText });
     } finally {
       setLoading(false);
     }
   };
-  
-  const messageClass = message 
-    ? message.type === 'success' 
-      ? 'bg-green-100 border-green-400 text-green-700'
-      : 'bg-red-100 border-red-400 text-red-700'
-    : '';
+
+  const handleDelete = async () => {
+    if (!window.confirm(`Tem certeza que deseja excluir o docente ${docente.nome}? Esta ação é irreversível.`)) {
+      return;
+    }
+    if (!token) {
+      setMessage({ type: 'error', text: 'Sessão expirada.' });
+      return;
+    }
+
+    setLoading(true);
+    setMessage(null);
+    
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/docentes/${docente.id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `Falha ao excluir docente: ${response.statusText}`);
+      }
+
+      setMessage({ type: 'success', text: 'Docente excluído com sucesso!' });
+      setTimeout(onDone, 1500); 
+
+    } catch (err) {
+      const errorText = err instanceof Error ? err.message : 'Erro desconhecido ao excluir.';
+      setMessage({ type: 'error', text: errorText });
+    } finally {
+      setLoading(false);
+    }
+  };
+
 
   return (
     <div className="w-full max-w-lg mx-auto bg-white rounded-2xl shadow-xl p-8 mt-4">
-      <h2 className="text-2xl font-bold text-green-500 mb-6 text-center">Cadastrar Novo Docente</h2>
-      
+      <h2 className="text-2xl font-bold text-green-500 mb-6 text-center">Detalhes e Edição de Docente</h2>
+      <p className="text-sm text-gray-500 mb-4 text-center">Registro: {docente.registro}</p>
+
       {message && (
-        <div className={`p-3 mb-4 rounded-lg text-center font-medium ${messageClass}`}>
+        <div className={`p-3 mb-4 rounded-lg text-center font-medium ${
+          message.type === 'success' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+        }`}>
           {message.text}
         </div>
       )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        {/* Código de Funcionário */}
-        <div>
-          <label htmlFor="codigo" className="block text-sm font-medium text-gray-700 mb-1">
-            Código de Funcionário (Registro)
-          </label>
-          <input
-            type="text"
-            id="codigo"
-            name="codigo"
-            value={formData.codigo}
-            onChange={handleChange}
-            required
-            disabled={loading}
-            className="w-full px-3 py-2 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-green-400 focus:outline-none"
-          />
-        </div>
-
-        {/* Nome */}
+        {/* Campo de Nome */}
         <div>
           <label htmlFor="nome" className="block text-sm font-medium text-gray-700 mb-1">
             Nome do Docente
@@ -193,7 +181,7 @@ export default function UsersCreate({ onCreated, onCancel }: UsersCreateProps) {
             type="text"
             id="nome"
             name="nome"
-            value={formData.nome}
+            value={formData.nome || ''}
             onChange={handleChange}
             required
             disabled={loading}
@@ -210,7 +198,7 @@ export default function UsersCreate({ onCreated, onCancel }: UsersCreateProps) {
             type="email"
             id="email"
             name="email"
-            value={formData.email}
+            value={formData.email || ''}
             onChange={handleChange}
             required
             disabled={loading}
@@ -227,30 +215,13 @@ export default function UsersCreate({ onCreated, onCancel }: UsersCreateProps) {
             type="text"
             id="cpf"
             name="cpf"
-            value={formData.cpf}
+            value={formData.cpf || ''}
             onChange={handleChange}
             required
             disabled={loading}
             className="w-full px-3 py-2 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-green-400 focus:outline-none"
           />
         </div>*/}
-
-        {/* Senha */}
-        <div>
-          <label htmlFor="senha" className="block text-sm font-medium text-gray-700 mb-1">
-            Senha (Será criptografada no servidor)
-          </label>
-          <input
-            type="password"
-            id="senha"
-            name="senha"
-            value={formData.senha}
-            onChange={handleChange}
-            required
-            disabled={loading}
-            className="w-full px-3 py-2 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-green-400 focus:outline-none"
-          />
-        </div>
 
         {/* Matéria 
         <div>
@@ -261,13 +232,13 @@ export default function UsersCreate({ onCreated, onCancel }: UsersCreateProps) {
             type="text"
             id="materia"
             name="materia"
-            value={formData.materia}
+            value={formData.materia || ''}
             onChange={handleChange}
             required
             disabled={loading}
             className="w-full px-3 py-2 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-green-400 focus:outline-none"
           />
-        </div>*/}
+        </div>
 
         {/* Turmas atribuídas 
         <div>
@@ -277,6 +248,7 @@ export default function UsersCreate({ onCreated, onCancel }: UsersCreateProps) {
           <select
             multiple
             id="turmas"
+            name="turmas"
             value={formData.turmas}
             onChange={handleSelectChange}
             disabled={loading}
@@ -292,8 +264,8 @@ export default function UsersCreate({ onCreated, onCancel }: UsersCreateProps) {
             Segure <kbd>Ctrl</kbd> (ou <kbd>Cmd</kbd> no Mac) para selecionar mais de uma.
           </p>
         </div>*/}
-
-        {/* Nível de Acesso */}
+        
+        {/* Campo de Nível de Acesso */}
         <div>
           <label htmlFor="nivelAcesso" className="block text-sm font-medium text-gray-700 mb-1">
             Nível de Acesso
@@ -318,7 +290,7 @@ export default function UsersCreate({ onCreated, onCancel }: UsersCreateProps) {
           </select>
         </div>
 
-        {/* Botões */}
+        {/* Botões de Ação */}
         <div className="flex justify-between gap-4 pt-2">
           <button
             type="button"
@@ -326,17 +298,28 @@ export default function UsersCreate({ onCreated, onCancel }: UsersCreateProps) {
             disabled={loading}
             className="flex-1 bg-gray-300 text-gray-700 font-semibold py-2 px-4 rounded-xl shadow hover:bg-gray-400 transition-colors"
           >
-            Cancelar
+            Voltar
           </button>
           <button
             type="submit"
             disabled={loading}
             className="flex-1 bg-green-500 text-white font-semibold py-2 px-4 rounded-xl shadow hover:bg-green-600 transition-colors disabled:opacity-50"
           >
-            {loading ? 'Salvando...' : 'Salvar Docente'}
+            {loading ? 'Salvando...' : 'Salvar Alterações'}
           </button>
         </div>
       </form>
+      
+      {/* Botão de Exclusão */}
+      <div className="mt-4 border-t pt-4 border-gray-200">
+        <button
+          onClick={handleDelete}
+          disabled={loading}
+          className="w-full bg-red-500 text-white font-semibold py-2 px-4 rounded-xl shadow hover:bg-red-600 transition-colors disabled:opacity-50"
+        >
+          {loading ? 'Excluindo...' : 'Excluir Docente'}
+        </button>
+      </div>
     </div>
   );
 }
