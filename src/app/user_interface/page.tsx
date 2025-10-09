@@ -5,10 +5,12 @@ import Bot from "@/components/Bot";
 import { JSX, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import EscolasCreate from "@/components/AdminUI/EscolasCreate";
-import UsersCreate from "@/components/AdminUI/UsersCreate";
-import StudentCreate from "@/components/AdminUI/StudentCreate";
+import UsersCreate from "@/components/AdminUI/Users/UsersCreate";
+import StudentCreate from "@/components/AdminUI/Student/StudentCreate";
 import ClassUI from "@/components/ClassUI";
-import UsersManager from "@/components/AdminUI/UsersManager";
+import UsersManager from "@/components/AdminUI/Users/UsersManager";
+import ClassManager from "@/components/AdminUI/Class/ClassManager";
+import StudentManager from "@/components/AdminUI/Student/StudentManager";
 
 export default function UserInterface() {
   const [selected, setSelected] = useState<string>('Área da Turma');
@@ -39,8 +41,8 @@ export default function UserInterface() {
     // Admin / Supervisor
     "Gerenciar Escolas": <EscolasCreate/>,
     "Gerenciar Docentes": <UsersManager/>,
-    "Gerenciar Turmas": <div>📝 Gerenciar Turmas</div>,
-    "Gerenciar Alunos": <StudentCreate/>,
+    "Gerenciar Turmas": <ClassManager/>,
+    "Gerenciar Alunos": <StudentManager/>,
   };
 
   return (  

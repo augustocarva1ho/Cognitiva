@@ -5,8 +5,8 @@ import Bot from "@/components/Bot";
 import { JSX, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import EscolasCreate from "@/components/AdminUI/EscolasCreate";
-import UsersCreate from "@/components/AdminUI/UsersCreate";
-import StudentCreate from "@/components/AdminUI/StudentCreate";
+import UsersCreate from "@/components/AdminUI/Users/UsersCreate";
+import StudentCreate from "@/components/AdminUI/Student/StudentCreate";
 
 export default function UserInterface() {
   const [selected, setSelected] = useState<string>('Área da Turma');
