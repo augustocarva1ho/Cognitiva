@@ -1,73 +1,294 @@
-"use client";
-import { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+'use client';
+import { useState, useEffect, useCallback, Fragment } from 'react';
+import { useAuth, Docente } from '@/context/AuthContext';
+import { motion, AnimatePresence } from 'framer-motion';
 
+// --- INTERFACES DE DADOS ---
+interface Turma { id: string; Nome: string; }
+interface Materia { id: string; nome: string; }
+interface Atividade { id: string; tipo: string; materia: Materia; notaMaxima: number; }
+interface Observacao { id: string; texto: string; professorId: string; data: string; }
+
+interface Aluno {
+  id: string; Nome: string; Matricula: string; Idade: number; turmaId: string;
+  turma: { Nome: string; id: string; };
+  // Aqui viriam dados de laudos, se buscássemos
+}
+
+interface NotaBimestral {
+  bimestre: number;
+  nota: number;
+  recuperacao: boolean;
+  materiaId: string;
+  alunoId: string;
+  materia: Materia;
+}
+
+interface Avaliacao {
+  id: string;
+  notaNumerica: number;
+  avaliacaoEscrita: string | null;
+  entregouNoPrazo: boolean;
+  atividadeId: string;
+  alunoId: string;
+  atividade: Atividade;
+}
+
+// O componente principal
 export default function ClassUI() {
-  const [selectedTurma, setSelectedTurma] = useState("");
-  const [selectedAluno, setSelectedAluno] = useState("");
-  const [temLaudo, setTemLaudo] = useState("não");
-  const [tabela, setTabela] = useState([
-    { materia: "", nota1: "", nota2: "", nota3: "", nota4: "" },
-  ]);
+  const { API_BASE_URL, token, user } = useAuth();
+  const [turmas, setTurmas] = useState<Turma[]>([]);
+  const [alunos, setAlunos] = useState<Aluno[]>([]);
+  const [materias, setMaterias] = useState<Materia[]>([]);
+  const [atividades, setAtividades] = useState<Atividade[]>([]);
+  const [selectedTurmaId, setSelectedTurmaId] = useState('');
+  const [selectedAluno, setSelectedAluno] = useState<Aluno | null>(null);
 
-  // Placeholder - futuramente vindo do banco
-  const turmas = ["Turma A", "Turma B", "Turma C"];
-  const alunosPorTurma: Record<string, string[]> = {
-    "Turma A": ["João Silva", "Maria Souza"],
-    "Turma B": ["Carlos Lima", "Fernanda Rocha"],
-    "Turma C": ["Pedro Santos", "Ana Paula"],
-  };
+  const [loading, setLoading] = useState(true);
+  const [loadingAlunoData, setLoadingAlunoData] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Dados do aluno selecionado
+  const [notasBimestrais, setNotasBimestrais] = useState<NotaBimestral[]>([]);
+  const [observacaoTexto, setObservacaoTexto] = useState('');
+  const [avaliacoes, setAvaliacoes] = useState<Avaliacao[]>([]);
+  
+  // Estado para nova avaliação de atividade
+  const [novaAvaliacao, setNovaAvaliacao] = useState({
+    atividadeId: '',
+    notaNumerica: '' as number | '',
+    avaliacaoEscrita: '',
+    observacaoPrazo: '',
+    entregouNoPrazo: true,
+    error: '',
+    loading: false,
+  });
+
+  // Placeholder para Laudo (manter como solicitado)
+  const [temLaudo, setTemLaudo] = useState('não');
   const neurodivs = ["TDAH", "TEA", "Dislexia", "Outros"];
 
-  const handleTabelaChange = (index: number, campo: string, valor: string) => {
-    const novaTabela = [...tabela];
-    // @ts-ignore
-    novaTabela[index][campo] = valor;
-    setTabela(novaTabela);
+
+  // ----------------------------------------------------
+  // I. FUNÇÕES DE BUSCA DE DADOS
+  // ----------------------------------------------------
+
+  const fetchDependencies = useCallback(async () => {
+    if (!token) return;
+    setLoading(true);
+    try {
+      const [turmasRes, alunosRes, materiasRes, atividadesRes] = await Promise.all([
+        fetch(`${API_BASE_URL}/api/turmas`, { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(`${API_BASE_URL}/api/alunos`, { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(`${API_BASE_URL}/api/materias`, { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(`${API_BASE_URL}/api/atividades`, { headers: { Authorization: `Bearer ${token}` } }),
+      ]);
+
+      if (turmasRes.ok) setTurmas(await turmasRes.json());
+      if (alunosRes.ok) setAlunos(await alunosRes.json());
+      if (materiasRes.ok) setMaterias(await materiasRes.json());
+      if (atividadesRes.ok) setAtividades(await atividadesRes.json());
+    } catch (err) {
+      console.error('Erro ao buscar dados:', err);
+      setError('Falha ao carregar dados iniciais.');
+    } finally {
+      setLoading(false);
+    }
+  }, [API_BASE_URL, token]);
+
+  const fetchAlunoData = useCallback(async (alunoId: string) => {
+    if (!token || !alunoId) return;
+    setLoadingAlunoData(true);
+    try {
+      const [notasRes, observacoesRes, avaliacoesRes] = await Promise.all([
+        fetch(`${API_BASE_URL}/api/notasBimestrais/aluno/${alunoId}`, { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(`${API_BASE_URL}/api/observacoes/aluno/${alunoId}`, { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(`${API_BASE_URL}/api/avaliacoes/aluno/${alunoId}`, { headers: { Authorization: `Bearer ${token}` } }),
+      ]);
+
+      if (notasRes.ok) setNotasBimestrais(await notasRes.json());
+      if (observacoesRes.ok) {
+        const obsData = await observacoesRes.json();
+        setObservacaoTexto(obsData?.texto || '');
+      }
+      if (avaliacoesRes.ok) setAvaliacoes(await avaliacoesRes.json());
+    } catch (err) {
+      console.error('Erro ao buscar dados do aluno:', err);
+      setError('Falha ao carregar dados do aluno.');
+    } finally {
+      setLoadingAlunoData(false);
+    }
+  }, [API_BASE_URL, token]);
+
+  useEffect(() => { fetchDependencies(); }, [fetchDependencies]);
+  useEffect(() => { if (selectedAluno) fetchAlunoData(selectedAluno.id); }, [selectedAluno, fetchAlunoData]);
+
+
+  // ----------------------------------------------------
+  // II. FUNÇÕES DE SALVAMENTO
+  // ----------------------------------------------------
+  
+  const handleNotaChange = (materiaId: string, bimestre: number, field: 'nota' | 'recuperacao', value: any) => {
+    const notaValue = field === 'nota' ? (value === '' ? undefined : parseFloat(value)) : undefined;
+    
+    setNotasBimestrais(prev => {
+      const existingIndex = prev.findIndex(n => n.materiaId === materiaId && n.bimestre === bimestre);
+      
+      if (existingIndex > -1) {
+        return prev.map((n, i) => i === existingIndex ? { ...n, [field]: field === 'nota' ? notaValue : value } : n);
+      } else {
+        const newNota: NotaBimestral = { 
+          bimestre, materiaId, alunoId: selectedAluno!.id, 
+          materia: materias.find(m => m.id === materiaId)!, 
+          nota: 0, recuperacao: false 
+        } as NotaBimestral;
+        
+        return [...prev, { ...newNota, [field]: field === 'nota' ? notaValue : value } as NotaBimestral];
+      }
+    });
   };
 
-  const adicionarLinha = () => {
-    setTabela([...tabela, { materia: "", nota1: "", nota2: "", nota3: "", nota4: "" }]);
+  const handleSalvarNotas = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedAluno) return;
+    
+    const notasToSave = notasBimestrais.filter(n => n.alunoId === selectedAluno.id);
+    
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/notasBimestrais/salvarLote`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify({ alunoId: selectedAluno.id, notas: notasToSave })
+        });
+
+        if (!response.ok) throw new Error("Erro ao salvar notas.");
+
+        alert("Notas Bimestrais salvas com sucesso!");
+        fetchAlunoData(selectedAluno.id);
+    } catch (err) {
+        alert("Falha ao salvar notas: " + (err as Error).message);
+    }
   };
 
-  const removerLinha = (index: number) => {
-    setTabela(tabela.filter((_, i) => i !== index));
+  const handleSalvarObservacao = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedAluno || !observacaoTexto) return;
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/observacoes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ 
+          alunoId: selectedAluno.id, 
+          professorId: user?.id,
+          texto: observacaoTexto 
+        })
+      });
+      if (!response.ok) throw new Error("Erro ao salvar observação.");
+
+      alert("Observação salva com sucesso!");
+      fetchAlunoData(selectedAluno.id);
+    } catch (err) {
+      alert("Falha ao salvar observação: " + (err as Error).message);
+    }
   };
+
+  const handleSalvarAvaliacao = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedAluno || !novaAvaliacao.atividadeId || novaAvaliacao.notaNumerica === '') return;
+    
+    const payload = {
+        alunoId: selectedAluno.id,
+        atividadeId: novaAvaliacao.atividadeId,
+        notaNumerica: Number(novaAvaliacao.notaNumerica),
+        avaliacaoEscrita: novaAvaliacao.avaliacaoEscrita,
+        // O campo entregouNoPrazo será True/False baseado na observacaoPrazo
+        entregouNoPrazo: novaAvaliacao.observacaoPrazo.toLowerCase().includes('sim') || novaAvaliacao.observacaoPrazo.toLowerCase().includes('prazo'), 
+        observacaoPrazo: novaAvaliacao.observacaoPrazo, 
+        professorId: user?.id,
+    };
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/avaliacoes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) throw new Error("Erro ao atribuir avaliação.");
+      
+      alert("Avaliação atribuída com sucesso!");
+      setNovaAvaliacao(prev => ({ ...prev, atividadeId: '', notaNumerica: '', avaliacaoEscrita: '', observacaoPrazo: '' }));
+      fetchAlunoData(selectedAluno.id);
+    } catch (err) {
+      alert("Falha ao salvar avaliação: " + (err as Error).message);
+    }
+  };
+
+
+  // ----------------------------------------------------
+  // III. LÓGICA DE RENDERIZAÇÃO
+  // ----------------------------------------------------
+
+  const alunosDaTurma = selectedTurmaId
+    ? alunos.filter((aluno) => aluno.turmaId === selectedTurmaId)
+    : [];
+
+  const handleSelectAluno = (alunoId: string) => {
+    const aluno = alunos.find((a) => a.id === alunoId);
+    setSelectedAluno(aluno || null);
+  };
+
+  const getNota = (materiaId: string, bimestre: number): Partial<NotaBimestral> => {
+    return notasBimestrais.find(n => n.materiaId === materiaId && n.bimestre === bimestre) || { nota: undefined, recuperacao: false } as Partial<NotaBimestral>;
+  }
+
+  if (loading) { return <p className="text-center p-8">A carregar dados...</p>; }
+  if (error) { return <p className="text-center p-8 text-red-500">Erro: {error}</p>; }
 
   return (
     <div className="p-6">
-      {/* Seleção de Turma */}
-      <label className="block mb-2 font-bold">Selecione a Turma:</label>
-      <select
-        value={selectedTurma}
-        onChange={(e) => {
-          setSelectedTurma(e.target.value);
-          setSelectedAluno("");
-        }}
-        className="border p-2 rounded w-64"
-      >
-        <option value="">-- Nenhuma --</option>
-        {turmas.map((turma) => (
-          <option key={turma} value={turma}>{turma}</option>
-        ))}
-      </select>
-
-      {/* Seleção de Aluno */}
-      {selectedTurma && (
-        <div className="mt-4">
-          <label className="block mb-2 font-bold">Selecione o Aluno:</label>
+      <div className="flex gap-4">
+        {/* Seleção de Turma */}
+        <div>
+          <label className="block mb-2 font-bold">Selecione a Turma:</label>
           <select
-            value={selectedAluno}
-            onChange={(e) => setSelectedAluno(e.target.value)}
+            value={selectedTurmaId}
+            onChange={(e) => {
+              setSelectedTurmaId(e.target.value);
+              setSelectedAluno(null);
+            }}
             className="border p-2 rounded w-64"
           >
-            <option value="">-- Nenhum --</option>
-            {alunosPorTurma[selectedTurma]?.map((aluno) => (
-              <option key={aluno} value={aluno}>{aluno}</option>
+            <option value="">-- Nenhuma --</option>
+            {turmas.map((turma) => (
+              <option key={turma.id} value={turma.id}>
+                {turma.Nome}
+              </option>
             ))}
           </select>
         </div>
-      )}
+
+        {/* Seleção de Aluno */}
+        {selectedTurmaId && (
+          <div>
+            <label className="block mb-2 font-bold">Selecione o Aluno:</label>
+            <select
+              value={selectedAluno?.id || ''}
+              onChange={(e) => handleSelectAluno(e.target.value)}
+              className="border p-2 rounded w-64"
+              disabled={loadingAlunoData}
+            >
+              <option value="">-- Nenhum --</option>
+              {alunosDaTurma.map((aluno) => (
+                <option key={aluno.id} value={aluno.id}>
+                  {aluno.Nome}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+      </div>
 
       {/* Conteúdo do Aluno */}
       <AnimatePresence>
@@ -78,118 +299,164 @@ export default function ClassUI() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 15 }}
           >
-            {/* Coluna Esquerda */}
+            {/* Coluna Esquerda: Dados do Aluno */}
             <div className="w-1/3 bg-gray-100 p-4 rounded shadow">
-              <img
-                src="/placeholder-profile.png"
-                alt="Foto do aluno"
-                className="w-32 h-32 mx-auto rounded-full bg-gray-300"
-              />
-              <h2 className="text-center font-bold mt-4">{selectedAluno}</h2>
+              <h2 className="text-center font-bold text-xl mt-4">{selectedAluno.Nome}</h2>
+              <p className="text-center text-sm text-gray-600">Matrícula: {selectedAluno.Matricula}</p>
+              <p className="text-center text-sm text-gray-600">Idade: {selectedAluno.Idade || 'N/A'}</p>
+              
+              <hr className="my-4"/>
+              <h3 className="font-bold">Observações do Professor</h3>
+              <form onSubmit={handleSalvarObservacao}>
+                <textarea 
+                  className="border w-full p-2 rounded mt-2 mb-2" 
+                  rows={4}
+                  value={observacaoTexto}
+                  onChange={(e) => setObservacaoTexto(e.target.value)}
+                  disabled={loadingAlunoData}
+                />
+                <button type="submit" className="bg-green-500 text-white w-full px-4 py-2 rounded" disabled={loadingAlunoData}>
+                  Salvar Observação
+                </button>
+              </form>
 
+              {/* Lógica de Laudo (Mantida) */}
+              <hr className="my-4"/>
               <label className="block mt-4">Possui laudo?</label>
-              <select
-                value={temLaudo}
-                onChange={(e) => setTemLaudo(e.target.value)}
-                className="border p-2 rounded w-full"
-              >
+              <select value={temLaudo} onChange={(e) => setTemLaudo(e.target.value)} className="border p-2 rounded w-full">
                 <option value="não">Não</option>
                 <option value="sim">Sim</option>
               </select>
-
               {temLaudo === "sim" && (
                 <div className="mt-4">
-                  <label className="block mb-2">Tipo de Neurodivergência:</label>
+                  <label className="block mb-2">Tipo de Neurodivergência (Placeholder):</label>
                   <select multiple className="border p-2 rounded w-full h-24">
-                    {neurodivs.map((n) => (
-                      <option key={n} value={n}>{n}</option>
-                    ))}
+                    {neurodivs.map((n) => (<option key={n} value={n}>{n}</option>))}
                   </select>
                 </div>
               )}
             </div>
 
-            {/* Coluna Direita */}
+            {/* Coluna Direita: Notas e Atividades */}
             <div className="w-2/3 bg-white p-4 rounded shadow">
-              <table className="w-full border mb-4">
-                <thead>
-                  <tr className="bg-gray-200">
-                    <th className="border p-2">Matéria</th>
-                    <th className="border p-2">1º Bim</th>
-                    <th className="border p-2">2º Bim</th>
-                    <th className="border p-2">3º Bim</th>
-                    <th className="border p-2">4º Bim</th>
-                    <th className="border p-2">Ações</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {tabela.map((linha, index) => (
-                    <tr key={index}>
-                      {["materia", "nota1", "nota2", "nota3", "nota4"].map((campo) => (
-                        <td key={campo} className="border p-2">
-                          <input
-                            type="text"
-                            value={(linha as any)[campo]}
-                            onChange={(e) => handleTabelaChange(index, campo, e.target.value)}
-                            className="border p-1 w-full"
-                          />
-                        </td>
-                      ))}
-                      <td className="border p-2 text-center">
-                        <button
-                          onClick={() => removerLinha(index)}
-                          className="bg-red-500 text-white px-2 py-1 rounded"
-                        >
-                          Remover
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <h3 className="font-bold mb-2">Notas Bimestrais</h3>
+              <form onSubmit={handleSalvarNotas}>
+                <div className="overflow-x-auto">
+                    <table className="w-full border mb-4 table-fixed text-sm">
+                      <thead>
+                        <tr className="bg-gray-200">
+                          <th className="border p-2 w-[150px] text-left">Matéria</th>
+                          <th className="border p-2 w-[80px] text-center">1º Bim</th>
+                          <th className="border p-2 w-[50px] text-center">Rec.</th>
+                          <th className="border p-2 w-[80px] text-center">2º Bim</th>
+                          <th className="border p-2 w-[50px] text-center">Rec.</th>
+                          <th className="border p-2 w-[80px] text-center">3º Bim</th>
+                          <th className="border p-2 w-[50px] text-center">Rec.</th>
+                          <th className="border p-2 w-[80px] text-center">4º Bim</th>
+                          <th className="border p-2 w-[50px] text-center">Rec.</th>
+                        </tr>
+                      </thead>
 
-              <button
-                onClick={adicionarLinha}
-                className="bg-blue-500 text-white px-4 py-2 rounded mb-4"
-              >
-                Adicionar Linha
-              </button>
-
-              <label className="block font-bold">Observações:</label>
-              <textarea className="border w-full p-2 rounded mb-4" rows={3} />
-
-              <label className="block font-bold">Atribuir Atividade:</label>
-              <div className="flex gap-2 mb-4">
-                <select className="border p-2 rounded w-1/3">
-                  <option value="">Selecione a Matéria</option>
-                  <option>Matemática</option>
-                  <option>Português</option>
-                  <option>Ciências</option>
-                </select>
-                <input
-                  type="number"
-                  placeholder="Nota"
-                  className="border p-2 rounded w-20"
-                />
-                <input
-                  type="text"
+                      <tbody>
+                        {materias.map((materia) => (
+                          <tr key={materia.id}>
+                            <td className="border p-2 font-medium">{materia.nome}</td>
+                            {[1, 2, 3, 4].map(bimestre => {
+                              const nota = getNota(materia.id, bimestre);
+                              return (
+                                <Fragment key={bimestre}>
+                                  <td className="border p-1 text-center">
+                                    <input
+                                      type="number"
+                                      min="0" max="10" step="0.1"
+                                      className="border p-1 w-12 text-center rounded"
+                                      value={nota.nota || ''}
+                                      onChange={(e) => handleNotaChange(materia.id, bimestre, 'nota', e.target.value)}
+                                      disabled={loadingAlunoData}
+                                    />
+                                  </td>
+                                  <td className="border p-1 text-center">
+                                    <input
+                                      type="checkbox"
+                                      className="h-4 w-4"
+                                      checked={nota.recuperacao || false}
+                                      onChange={(e) => handleNotaChange(materia.id, bimestre, 'recuperacao', e.target.checked)}
+                                      disabled={loadingAlunoData}
+                                    />
+                                  </td>
+                                </Fragment>
+                              );
+                            })}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                </div>
+                <button type="submit" className="bg-green-500 text-white px-4 py-2 rounded" disabled={loadingAlunoData}>
+                  Salvar Notas Bimestrais
+                </button>
+              </form>
+              
+              <hr className="my-6"/>
+              
+              <h3 className="font-bold mb-2">Atribuição de Atividade</h3>
+              <form onSubmit={handleSalvarAvaliacao}>
+                {/* Seleção de atividade */}
+                <div className="flex gap-2 mb-2">
+                  <select 
+                    className="border p-2 rounded flex-1"
+                    value={novaAvaliacao.atividadeId}
+                    onChange={(e) => setNovaAvaliacao(prev => ({ ...prev, atividadeId: e.target.value }))}
+                    disabled={loadingAlunoData}
+                    required
+                  >
+                    <option value="">Selecione a Atividade</option>
+                    {atividades.map(ativ => (
+                      <option key={ativ.id} value={ativ.id}>{ativ.tipo} - {ativ.materia.nome} (Max: {ativ.notaMaxima})</option>
+                    ))}
+                  </select>
+                  <input 
+                    type="number" 
+                    placeholder="Nota" 
+                    className="border p-2 rounded w-20" 
+                    value={novaAvaliacao.notaNumerica}
+                    onChange={(e) => setNovaAvaliacao(prev => ({ ...prev, notaNumerica: Number(e.target.value) }))}
+                    disabled={loadingAlunoData}
+                    required
+                    min="0"
+                    max={atividades.find(a => a.id === novaAvaliacao.atividadeId)?.notaMaxima || 10}
+                    step="0.1"
+                  />
+                </div>
+                
+                {/* Avaliação escrita */}
+                <textarea 
+                  className="border w-full p-2 rounded mb-2" 
+                  rows={2} 
                   placeholder="Avaliação escrita"
-                  className="border p-2 rounded flex-1"
-                />
-              </div>
+                  value={novaAvaliacao.avaliacaoEscrita}
+                  onChange={(e) => setNovaAvaliacao(prev => ({ ...prev, avaliacaoEscrita: e.target.value }))}
+                  disabled={loadingAlunoData}
+                ></textarea>
+                
+                {/* Campo "Observações sobre o Prazo/Entrega" */}
+                <div className="flex flex-col gap-1 mb-4">
+                  <label htmlFor="observacaoPrazo" className="text-sm font-medium">Observações sobre o Prazo/Entrega:</label>
+                  <textarea 
+                    id="observacaoPrazo"
+                    placeholder="Ex: Entregue com 1 dia de atraso. Baseado neste campo, o sistema deduz se foi entregue no prazo."
+                    value={novaAvaliacao.observacaoPrazo}
+                    onChange={(e) => setNovaAvaliacao(prev => ({ ...prev, observacaoPrazo: e.target.value }))}
+                    disabled={loadingAlunoData}
+                    className="border p-2 rounded text-sm w-full"
+                    rows={1}
+                  />
+                </div>
 
-              {/* Botões */}
-              <div className="flex gap-4">
-                <button className="bg-purple-500 text-white px-4 py-2 rounded">
-                  Gerar Relatório
+                <button type="submit" className="bg-green-500 text-white px-4 py-2 rounded" disabled={loadingAlunoData}>
+                  Salvar Avaliação
                 </button>
-                <button className="bg-yellow-500 text-white px-4 py-2 rounded">
-                  Identificar
-                </button>
-                <button className="bg-green-500 text-white px-4 py-2 rounded">
-                  Salvar
-                </button>
-              </div>
+              </form>
             </div>
           </motion.div>
         )}
