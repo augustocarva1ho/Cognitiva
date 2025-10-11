@@ -5,12 +5,12 @@ import Bot from "@/components/Bot";
 import { JSX, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import EscolasCreate from "@/components/AdminUI/EscolasCreate";
-import UsersCreate from "@/components/AdminUI/Users/UsersCreate";
-import StudentCreate from "@/components/AdminUI/Student/StudentCreate";
 import ClassUI from "@/components/ClassUI";
 import UsersManager from "@/components/AdminUI/Users/UsersManager";
 import ClassManager from "@/components/AdminUI/Class/ClassManager";
 import StudentManager from "@/components/AdminUI/Student/StudentManager";
+import SubjectManager from "@/components/AdminUI/Subject/SubjectManager";
+import ActivitiesManager from "@/components/AdminUI/Activitie/ActivitiesManager";
 
 export default function UserInterface() {
   const [selected, setSelected] = useState<string>('Área da Turma');
@@ -28,6 +28,7 @@ export default function UserInterface() {
     'Gerenciar Docentes',
     'Gerenciar Turmas',
     'Gerenciar Alunos',
+    'Gerenciar Matérias',
   ];
 
   // Conteúdos de cada opção
@@ -35,7 +36,7 @@ export default function UserInterface() {
     // Professor
     "Área da Turma": <ClassUI/>,
     "Gerar Insight": <div>💡 Ferramenta de Insights</div>,
-    "Gerir Atividades": <div>📝 Gestão de Atividades</div>,
+    "Gerir Atividades": <ActivitiesManager/>,
     "Comunicação": <div>💬 Painel de Comunicação</div>,
 
     // Admin / Supervisor
@@ -43,6 +44,7 @@ export default function UserInterface() {
     "Gerenciar Docentes": <UsersManager/>,
     "Gerenciar Turmas": <ClassManager/>,
     "Gerenciar Alunos": <StudentManager/>,
+    "Gerenciar Matérias": <SubjectManager/>
   };
 
   return (  
