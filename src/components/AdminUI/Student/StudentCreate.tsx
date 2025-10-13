@@ -3,6 +3,8 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
+import { FaPlus, FaTrashAlt } from "react-icons/fa";
+import { Fragment } from "react";
 
 // Define a interface para o tipo 'Turma'
 interface Turma {
@@ -10,285 +12,371 @@ interface Turma {
   Nome: string;
 }
 
-// Define os tipos esperados pelo StudentManager
-interface StudentCreateProps {
-  onCreated: () => void;
-  onCancel: () => void;
+// Define os tipos para o novo formulário de condições
+interface ConditionFormData {
+    nomeCondicao: string; // Texto livre
+    statusComprovacao: string; // Laudo ou Suspeita
+    descricaoAdicional: string;
 }
 
-// O tipo do formulário
+// O tipo do formulário principal
 interface FormData {
-  Nome: string; // CORRIGIDO: Capitalizado
-  Matricula: string; // CORRIGIDO: Capitalizado
-  Idade: number | ''; // Capitalizado
-  turmaId: string;
-  possuiLaudo: boolean;
-  descricaoLaudo: string;
+    Nome: string;
+    Matricula: string;
+    Idade: number | '';
+    turmaId: string;
+    possuiCondicao: boolean;
+}
+
+// Define os tipos esperados pelo StudentManager
+interface StudentCreateProps {
+    onCreated: () => void;
+    onCancel: () => void;
 }
 
 export default function StudentCreate({ onCreated, onCancel }: StudentCreateProps) {
-  const { API_BASE_URL, token } = useAuth();
-  const router = useRouter();
-  
-  const [formData, setFormData] = useState<FormData>({
-    Nome: "",
-    Matricula: "",
-    Idade: '',
-    turmaId: "",
-    possuiLaudo: false,
-    descricaoLaudo: "",
-  });
+    const { API_BASE_URL, token } = useAuth();
+    const router = useRouter();
 
-  const [turmas, setTurmas] = useState<Turma[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [loadingTurmas, setLoadingTurmas] = useState(true);
-  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+    const [formData, setFormData] = useState<FormData>({
+        Nome: "",
+        Matricula: "",
+        Idade: '',
+        turmaId: "",
+        possuiCondicao: false,
+    });
 
-  // UseEffect para buscar as turmas da API
-  useEffect(() => {
-    const fetchTurmas = async () => {
-        setLoadingTurmas(true);
+    const [conditionsData, setConditionsData] = useState<ConditionFormData[]>([{ nomeCondicao: "", statusComprovacao: "Suspeita Médica", descricaoAdicional: "" }]);
+    const [turmas, setTurmas] = useState<Turma[]>([]);
+    const [loading, setLoading] = useState(false);
+    const [loadingTurmas, setLoadingTurmas] = useState(true);
+    const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+    // UseEffect para buscar as turmas da API
+    useEffect(() => {
+        const fetchTurmas = async () => {
+            if (!token) return;
+            setLoadingTurmas(true);
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/turmas`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                if (!response.ok) throw new Error('Falha ao buscar turmas');
+                const data: Turma[] = await response.json();
+                setTurmas(data);
+                if (data.length > 0) setFormData(prev => ({ ...prev, turmaId: data[0].id }));
+            } catch (error) {
+                setMessage({ type: 'error', text: 'Não foi possível carregar as turmas.' });
+            } finally {
+                setLoadingTurmas(false);
+            }
+        };
+        fetchTurmas();
+    }, [API_BASE_URL, token, router]);
+
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+        const { name, value } = e.target;
+        setFormData((prev) => ({ ...prev, [name]: name === "Idade" ? (value === "" ? "" : Number(value)) : value }));
+        setMessage(null);
+    };
+
+    const handlePossuiCondicaoChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        const value = e.target.value === 'sim';
+        setFormData((prev) => ({ ...prev, possuiCondicao: value }));
+        if (value && conditionsData.length === 0) {
+            handleAddCondition();
+        } else if (!value) {
+            setConditionsData([]);
+        }
+        setMessage(null);
+    }
+
+    const handleConditionChange = (index: number, e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+        const { name, value } = e.target;
+        const updatedConditions = [...conditionsData];
+        updatedConditions[index] = { ...updatedConditions[index], [name]: value };
+        setConditionsData(updatedConditions);
+    };
+
+    const handleAddCondition = () => {
+        setConditionsData(prev => [...prev, { nomeCondicao: "", statusComprovacao: "Suspeita Médica", descricaoAdicional: "" }]);
+    };
+
+    const handleRemoveCondition = (index: number) => {
+        const updatedConditions = conditionsData.filter((_, i) => i !== index);
+        setConditionsData(updatedConditions);
+        if (updatedConditions.length === 0) {
+            setFormData(prev => ({ ...prev, possuiCondicao: false }));
+        }
+    };
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
         if (!token) {
-          setLoadingTurmas(false);
-          return;
+            setMessage({ type: 'error', text: 'Sessão expirada. Faça login novamente.' });
+            router.push('/');
+            return;
         }
 
-        const url = `${API_BASE_URL}/api/turmas`;
-        
+        setLoading(true);
+        setMessage(null);
+
+        let alunoId = "";
         try {
-            const response = await fetch(url, {
-                headers: {
-                    Authorization: `Bearer ${token}`
-                }
+            const alunoPayload = {
+                Nome: formData.Nome,
+                Matricula: formData.Matricula,
+                Idade: formData.Idade,
+                turmaId: formData.turmaId,
+            };
+
+            const alunoResponse = await fetch(`${API_BASE_URL}/api/alunos`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify(alunoPayload),
             });
-            if (!response.ok) {
-                throw new Error('Falha ao buscar turmas');
+
+            if (!alunoResponse.ok) {
+                const errorData = await alunoResponse.json();
+                throw new Error(errorData.error || `Erro de servidor ao criar aluno: ${alunoResponse.status}`);
             }
-            const data: Turma[] = await response.json();
-            setTurmas(data);
-            // Define a primeira turma como padrão, se existir
-            if (data.length > 0) {
-                setFormData(prev => ({ ...prev, turmaId: data[0].id }));
+            const alunoData = await alunoResponse.json();
+            alunoId = alunoData.aluno.id;
+
+            if (formData.possuiCondicao && conditionsData.length > 0) {
+                const condicoesValidas = conditionsData.filter(c => c.nomeCondicao && c.statusComprovacao);
+                for (const condition of condicoesValidas) {
+                    const condicaoPayload = {
+                        alunoId: alunoId,
+                        nomeCondicao: condition.nomeCondicao,
+                        statusComprovacao: condition.statusComprovacao,
+                        descricaoAdicional: condition.descricaoAdicional
+                    };
+
+                    const condicaoResponse = await fetch(`${API_BASE_URL}/api/condicoes/atribuir`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                        body: JSON.stringify(condicaoPayload),
+                    });
+                    if (!condicaoResponse.ok) {
+                         console.error("Erro ao atribuir condição:", await condicaoResponse.json());
+                    }
+                }
             }
-        } catch (error) {
-            console.error('Erro ao buscar turmas:', error);
-            setMessage({ type: 'error', text: 'Não foi possível carregar as turmas.' });
+
+            setMessage({ type: 'success', text: 'Aluno e condições cadastrados com sucesso!' });
+            
+            setFormData({ Nome: "", Matricula: "", Idade: '', turmaId: turmas[0]?.id || "", possuiCondicao: false });
+            setConditionsData([{ nomeCondicao: "", statusComprovacao: "Suspeita Médica", descricaoAdicional: "" }]);
+
+            setTimeout(onCreated, 1500);
+
+        } catch (err) {
+            const errorText = err instanceof Error ? err.message : 'Erro desconhecido ao cadastrar.';
+            setMessage({ type: 'error', text: errorText });
         } finally {
-            setLoadingTurmas(false);
+            setLoading(false);
         }
     };
-    fetchTurmas();
-  }, [API_BASE_URL, token]);
 
+    const messageClass = message
+        ? message.type === 'success'
+            ? 'bg-green-100 border-green-400 text-green-700'
+            : 'bg-red-100 border-red-400 text-red-700'
+        : '';
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    let finalValue: string | number = value;
+    return (
+        <div className="w-full mx-auto p-4 md:p-8 bg-gray-50 min-h-screen">
+            <div className="bg-white rounded-2xl shadow-xl p-6 md:p-8">
+                <h2 className="text-2xl font-bold text-green-600 mb-6 text-center">Cadastrar Novo Aluno</h2>
+                
+                {message && (
+                    <div className={`p-3 mb-4 rounded-lg text-center font-medium ${messageClass}`}>
+                        {message.text}
+                    </div>
+                )}
 
-    if (name === "Idade") {
-        finalValue = value === "" ? "" : Number(value);
-    }
-    
-    // CORRIGIDO: o `name` do input corresponde à chave maiúscula
-    setFormData((prev) => ({ ...prev, [name]: finalValue }));
-    setMessage(null);
-  };
-  
-  const handleLaudoChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const value = e.target.value === 'sim';
-    setFormData((prev) => ({ 
-        ...prev, 
-        possuiLaudo: value,
-        descricaoLaudo: value ? prev.descricaoLaudo : ""
-    }));
-    setMessage(null);
-  }
+                <form onSubmit={handleSubmit}>
+                    <div className="flex flex-col md:flex-row gap-8">
+                        {/* Formulário Principal */}
+                        <div className="flex-1 space-y-4">
+                            <div>
+                                <label htmlFor="nome" className="block text-sm font-medium text-gray-700 mb-1">
+                                    Nome do Aluno
+                                </label>
+                                <input
+                                    type="text"
+                                    id="nome"
+                                    name="Nome"
+                                    value={formData.Nome}
+                                    onChange={handleChange}
+                                    required
+                                    disabled={loading}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-green-400 focus:outline-none"
+                                />
+                            </div>
+                            <div>
+                                <label htmlFor="matricula" className="block text-sm font-medium text-gray-700 mb-1">
+                                    Matrícula
+                                </label>
+                                <input
+                                    type="text"
+                                    id="matricula"
+                                    name="Matricula"
+                                    value={formData.Matricula}
+                                    onChange={handleChange}
+                                    required
+                                    disabled={loading}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-green-400 focus:outline-none"
+                                />
+                            </div>
+                            <div>
+                                <label htmlFor="idade" className="block text-sm font-medium text-gray-700 mb-1">
+                                    Idade
+                                </label>
+                                <input
+                                    type="number"
+                                    id="idade"
+                                    name="Idade"
+                                    value={formData.Idade}
+                                    onChange={handleChange}
+                                    disabled={loading}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-green-400 focus:outline-none"
+                                />
+                            </div>
+                            <div>
+                                <label htmlFor="turmaId" className="block text-sm font-medium text-gray-700 mb-1">
+                                    Turma
+                                </label>
+                                <select
+                                    id="turmaId"
+                                    name="turmaId"
+                                    value={formData.turmaId}
+                                    onChange={handleChange}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-green-400 focus:outline-none"
+                                    required
+                                    disabled={loadingTurmas || loading}
+                                >
+                                    <option value="" disabled>
+                                        {loadingTurmas ? 'A carregar...' : 'Selecione uma turma'}
+                                    </option>
+                                    {turmas.map((turma) => (
+                                        <option key={turma.id} value={turma.id}>
+                                            {turma.Nome}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div>
+                                <label htmlFor="possuiCondicao" className="block text-sm font-medium text-gray-700 mb-1">
+                                    Possui neurodivergência ou condição?
+                                </label>
+                                <select
+                                    id="possuiCondicao"
+                                    name="possuiCondicao"
+                                    value={formData.possuiCondicao ? 'sim' : 'nao'}
+                                    onChange={handlePossuiCondicaoChange}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-green-400 focus:outline-none"
+                                    disabled={loading}
+                                >
+                                    <option value="nao">Não</option>
+                                    <option value="sim">Sim</option>
+                                </select>
+                                <p className="mt-2 text-xs text-gray-500">
+                                    *A suspeita deve ter comprovação médica profissional e não apenas de pais ou professores.
+                                </p>
+                            </div>
+                        </div>
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!token) {
-      setMessage({ type: 'error', text: 'Sessão expirada. Faça login novamente.' });
-      router.push('/');
-      return;
-    }
-    
-    setLoading(true);
-    setMessage(null);
-
-    const payload = {
-      ...formData,
-      // Se não possui laudo, remove o campo da descrição do payload
-      ...(formData.possuiLaudo && { laudo: { create: { descricao: formData.descricaoLaudo } } })
-    };
-
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/alunos`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || `Erro de servidor: ${response.status}`);
-      }
-
-      setMessage({ type: 'success', text: 'Aluno cadastrado com sucesso!' });
-      
-      setFormData({
-        Nome: "", Matricula: "", Idade: '', turmaId: turmas[0]?.id || "", possuiLaudo: false, descricaoLaudo: ""
-      });
-      
-      setTimeout(onCreated, 1500); 
-
-    } catch (err) {
-      const errorText = err instanceof Error ? err.message : 'Erro desconhecido ao cadastrar.';
-      setMessage({ type: 'error', text: errorText });
-    } finally {
-      setLoading(false);
-    }
-  };
-  
-  const messageClass = message 
-    ? message.type === 'success' 
-      ? 'bg-green-100 border-green-400 text-green-700'
-      : 'bg-red-100 border-red-400 text-red-700'
-    : '';
-
-  return (
-    <div className="w-full max-w-lg mx-auto bg-white rounded-2xl shadow-xl p-8 mt-4">
-      <h2 className="text-2xl font-bold text-green-500 mb-6 text-center">Cadastrar Novo Aluno</h2>
-      
-      {message && (
-        <div className={`p-3 mb-4 rounded-lg text-center font-medium ${messageClass}`}>
-          {message.text}
+                        {/* Formulário de Condições (condicional) */}
+                        {formData.possuiCondicao && (
+                            <div className="flex-1 pt-6 md:pt-0 md:pl-8 space-y-4 border-t md:border-t-0 md:border-l border-gray-200">
+                                <h3 className="text-xl font-semibold text-gray-800 mb-4">Laudos e Condições Médicas</h3>
+                                
+                                <div className="overflow-x-auto bg-gray-100 rounded-xl shadow-inner p-4">
+                                    <table className="w-full text-sm">
+                                        <thead>
+                                            <tr className="border-b">
+                                                <th className="p-2 text-left w-1/2">Condição/Nome</th>
+                                                <th className="p-2 text-left w-1/4">Status</th>
+                                                <th className="p-2 w-[50px]"></th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {conditionsData.map((condition, index) => (
+                                                <tr key={index} className="border-b border-gray-300">
+                                                    <td className="p-2">
+                                                        <input
+                                                            type="text"
+                                                            name="nomeCondicao"
+                                                            value={condition.nomeCondicao}
+                                                            onChange={(e) => handleConditionChange(index, e)}
+                                                            className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm"
+                                                            placeholder="Ex: TDAH, Ansiedade"
+                                                            required
+                                                        />
+                                                    </td>
+                                                    <td className="p-2">
+                                                        <select
+                                                            name="statusComprovacao"
+                                                            value={condition.statusComprovacao}
+                                                            onChange={(e) => handleConditionChange(index, e)}
+                                                            className="w-full px-2 py-1 border border-gray-300 rounded-md text-sm"
+                                                            required
+                                                        >
+                                                            <option value="Laudo Médico">Laudo Médico</option>
+                                                            <option value="Suspeita Médica">Suspeita Médica</option>
+                                                        </select>
+                                                    </td>
+                                                    <td className="p-2 text-center">
+                                                        <button type="button" onClick={() => handleRemoveCondition(index)} className="text-red-500 hover:text-red-700 transition-colors disabled:opacity-50" disabled={conditionsData.length === 1}>
+                                                            <FaTrashAlt />
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                    {/* Botão Adicionar Linha */}
+                                    <button type="button" onClick={handleAddCondition} className="mt-2 flex items-center justify-center w-full px-4 py-2 bg-green-100 text-green-700 font-semibold rounded-xl shadow-sm hover:bg-green-200 transition-colors text-sm">
+                                        <FaPlus className="mr-2" /> Adicionar Condição
+                                    </button>
+                                </div>
+                                <div className="pt-2">
+                                     <label className="block text-sm font-medium text-gray-700 mb-1">Descrição Adicional (Opcional)</label>
+                                    <textarea
+                                        name="descricaoAdicional"
+                                        value={conditionsData[0]?.descricaoAdicional || ""}
+                                        onChange={(e) => handleConditionChange(0, e)}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-green-400 focus:outline-none text-sm"
+                                        rows={2}
+                                        placeholder="Detalhes adicionais sobre todas as condições..."
+                                    />
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                    
+                    {/* Botões de Ação */}
+                    <div className="mt-8 flex justify-end gap-4">
+                        <button
+                            type="button"
+                            onClick={onCancel}
+                            disabled={loading}
+                            className="w-full md:w-auto bg-gray-300 text-gray-700 font-semibold py-2 px-6 rounded-xl shadow-md hover:bg-gray-400 transition-colors"
+                        >
+                            Cancelar
+                        </button>
+                        <button
+                            type="submit"
+                            disabled={loading}
+                            className="w-full md:w-auto bg-green-600 text-white font-semibold py-2 px-6 rounded-xl shadow-md hover:bg-green-700 transition-colors disabled:opacity-50"
+                        >
+                            {loading ? 'Salvando...' : 'Salvar Aluno'}
+                        </button>
+                    </div>
+                </form>
+            </div>
         </div>
-      )}
-
-      <form onSubmit={handleSubmit} className="space-y-4">
-        
-        {/* Nome */}
-        <div>
-          <label htmlFor="nome" className="block text-sm font-medium text-gray-700 mb-1">
-            Nome do Aluno
-          </label>
-          <input
-            type="text"
-            id="nome"
-            name="Nome" // CORRIGIDO: Maiúsculo
-            value={formData.Nome}
-            onChange={handleChange}
-            required
-            disabled={loading}
-            className="w-full px-3 py-2 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-green-400 focus:outline-none"
-          />
-        </div>
-
-        {/* Matrícula */}
-        <div>
-          <label htmlFor="matricula" className="block text-sm font-medium text-gray-700 mb-1">
-            Matrícula
-          </label>
-          <input
-            type="text"
-            id="matricula"
-            name="Matricula" // CORRIGIDO: Maiúsculo
-            value={formData.Matricula}
-            onChange={handleChange}
-            required
-            disabled={loading}
-            className="w-full px-3 py-2 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-green-400 focus:outline-none"
-          />
-        </div>
-
-        {/* Idade */}
-        <div>
-          <label htmlFor="idade" className="block text-sm font-medium text-gray-700 mb-1">
-            Idade
-          </label>
-          <input
-            type="number"
-            id="idade"
-            name="Idade" // CORRIGIDO: Maiúsculo
-            value={formData.Idade}
-            onChange={handleChange}
-            disabled={loading}
-            className="w-full px-3 py-2 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-green-400 focus:outline-none"
-          />
-        </div>
-        
-        {/* Turma */}
-        <div>
-          <label htmlFor="turmaId" className="block text-sm font-medium text-gray-700 mb-1">
-            Turma
-          </label>
-          <select
-            id="turmaId"
-            name="turmaId"
-            value={formData.turmaId}
-            onChange={handleChange}
-            className="w-full px-3 py-2 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-green-400 focus:outline-none"
-            required
-            disabled={loadingTurmas || loading}
-          >
-            <option value="" disabled>
-              {loadingTurmas ? 'A carregar...' : 'Selecione uma turma'}
-            </option>
-            {turmas.map((turma) => (
-              <option key={turma.id} value={turma.id}>
-                {turma.Nome}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {/* --- Lógica Condicional para Laudo --- */}
-        <div>
-          <label htmlFor="laudo" className="block text-sm font-medium text-gray-700 mb-1">
-            Possui laudo de neurodivergência?
-          </label>
-          <select
-            id="laudo"
-            name="laudo"
-            value={formData.possuiLaudo ? 'sim' : 'nao'}
-            onChange={handleLaudoChange}
-            className="w-full px-3 py-2 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-green-400 focus:outline-none"
-            disabled={loading}
-          >
-            <option value="nao">Não</option>
-            <option value="sim">Sim</option>
-          </select>
-        </div>
-        
-        {/* Placeholder condicional */}
-        {formData.possuiLaudo && (
-          <div className="bg-gray-100 p-4 rounded-xl text-center text-gray-600">
-            Placeholder para opções de laudo.
-          </div>
-        )}
-
-        {/* Botões */}
-        <div className="flex justify-between gap-4 pt-2">
-          <button
-            type="button"
-            onClick={onCancel}
-            disabled={loading}
-            className="flex-1 bg-gray-300 text-gray-700 font-semibold py-2 px-4 rounded-xl shadow hover:bg-gray-400 transition-colors"
-          >
-            Cancelar
-          </button>
-          <button
-            type="submit"
-            disabled={loading}
-            className="flex-1 bg-green-500 text-white font-semibold py-2 px-4 rounded-xl shadow hover:bg-green-600 transition-colors disabled:opacity-50"
-          >
-            {loading ? 'Salvando...' : 'Salvar Aluno'}
-          </button>
-        </div>
-      </form>
-    </div>
-  );
+    );
 }

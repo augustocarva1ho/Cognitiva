@@ -1,18 +1,24 @@
 'use client';
 import { useState, useEffect, useCallback, Fragment } from 'react';
-import { useAuth, Docente } from '@/context/AuthContext';
+import { useAuth } from '@/context/AuthContext';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useRouter } from 'next/navigation';
 
 // --- INTERFACES DE DADOS ---
 interface Turma { id: string; Nome: string; }
 interface Materia { id: string; nome: string; }
 interface Atividade { id: string; tipo: string; materia: Materia; notaMaxima: number; }
 interface Observacao { id: string; texto: string; professorId: string; data: string; }
+interface CondicaoAluno {
+  id: string;
+  nomeCondicao: string;
+  statusComprovacao: string;
+}
 
 interface Aluno {
   id: string; Nome: string; Matricula: string; Idade: number; turmaId: string;
   turma: { Nome: string; id: string; };
-  // Aqui viriam dados de laudos, se buscássemos
+  condicoes: CondicaoAluno[];
 }
 
 interface NotaBimestral {
@@ -28,7 +34,8 @@ interface Avaliacao {
   id: string;
   notaNumerica: number;
   avaliacaoEscrita: string | null;
-  entregouNoPrazo: boolean;
+  // CORRIGIDO: O campo é uma string
+  entregouNoPrazo: string | null; 
   atividadeId: string;
   alunoId: string;
   atividade: Atividade;
@@ -37,6 +44,8 @@ interface Avaliacao {
 // O componente principal
 export default function ClassUI() {
   const { API_BASE_URL, token, user } = useAuth();
+  const router = useRouter();
+
   const [turmas, setTurmas] = useState<Turma[]>([]);
   const [alunos, setAlunos] = useState<Aluno[]>([]);
   const [materias, setMaterias] = useState<Materia[]>([]);
@@ -48,30 +57,18 @@ export default function ClassUI() {
   const [loadingAlunoData, setLoadingAlunoData] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Dados do aluno selecionado
   const [notasBimestrais, setNotasBimestrais] = useState<NotaBimestral[]>([]);
   const [observacaoTexto, setObservacaoTexto] = useState('');
   const [avaliacoes, setAvaliacoes] = useState<Avaliacao[]>([]);
   
-  // Estado para nova avaliação de atividade
   const [novaAvaliacao, setNovaAvaliacao] = useState({
     atividadeId: '',
     notaNumerica: '' as number | '',
     avaliacaoEscrita: '',
-    observacaoPrazo: '',
-    entregouNoPrazo: true,
+    entregouNoPrazo: '',
     error: '',
     loading: false,
   });
-
-  // Placeholder para Laudo (manter como solicitado)
-  const [temLaudo, setTemLaudo] = useState('não');
-  const neurodivs = ["TDAH", "TEA", "Dislexia", "Outros"];
-
-
-  // ----------------------------------------------------
-  // I. FUNÇÕES DE BUSCA DE DADOS
-  // ----------------------------------------------------
 
   const fetchDependencies = useCallback(async () => {
     if (!token) return;
@@ -193,6 +190,39 @@ export default function ClassUI() {
     }
   };
 
+  const handleAvaliacaoSelectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const atividadeId = e.target.value;
+    
+    // 1. Busca a avaliação existente para esta atividade e aluno
+    const avaliacaoExistente = avaliacoes.find(a => a.atividadeId === atividadeId);
+    
+    // 2. Reseta o formulário OU preenche com dados existentes
+    if (avaliacaoExistente) {
+      // Preenche com dados existentes
+      setNovaAvaliacao(prev => ({
+        ...prev,
+        atividadeId: avaliacaoExistente.atividadeId,
+        notaNumerica: avaliacaoExistente.notaNumerica,
+        avaliacaoEscrita: avaliacaoExistente.avaliacaoEscrita || '',
+        // CORRIGIDO: Lê o campo entregouNoPrazo que o backend DEVE retornar como string
+        entregouNoPrazo: avaliacaoExistente.entregouNoPrazo || '',
+        error: '',
+        loading: false,
+      }));
+    } else {
+      // Reseta para o estado inicial, mantendo apenas o ID da atividade
+      setNovaAvaliacao(prev => ({
+        ...prev,
+        atividadeId: atividadeId,
+        notaNumerica: '' as number | '',
+        avaliacaoEscrita: '',
+        entregouNoPrazo: '',
+        error: '',
+        loading: false,
+      }));
+    }
+  };
+
   const handleSalvarAvaliacao = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedAluno || !novaAvaliacao.atividadeId || novaAvaliacao.notaNumerica === '') return;
@@ -202,9 +232,8 @@ export default function ClassUI() {
         atividadeId: novaAvaliacao.atividadeId,
         notaNumerica: Number(novaAvaliacao.notaNumerica),
         avaliacaoEscrita: novaAvaliacao.avaliacaoEscrita,
-        // O campo entregouNoPrazo será True/False baseado na observacaoPrazo
-        entregouNoPrazo: novaAvaliacao.observacaoPrazo.toLowerCase().includes('sim') || novaAvaliacao.observacaoPrazo.toLowerCase().includes('prazo'), 
-        observacaoPrazo: novaAvaliacao.observacaoPrazo, 
+        // CORRIGIDO: O campo entregouNoPrazo é uma string
+        entregouNoPrazo: novaAvaliacao.entregouNoPrazo, 
         professorId: user?.id,
     };
 
@@ -217,8 +246,8 @@ export default function ClassUI() {
 
       if (!response.ok) throw new Error("Erro ao atribuir avaliação.");
       
-      alert("Avaliação atribuída com sucesso!");
-      setNovaAvaliacao(prev => ({ ...prev, atividadeId: '', notaNumerica: '', avaliacaoEscrita: '', observacaoPrazo: '' }));
+      alert("Avaliação atribuída/atualizada com sucesso!");
+      setNovaAvaliacao(prev => ({ ...prev, atividadeId: '', notaNumerica: '', avaliacaoEscrita: '', entregouNoPrazo: '' }));
       fetchAlunoData(selectedAluno.id);
     } catch (err) {
       alert("Falha ao salvar avaliação: " + (err as Error).message);
@@ -306,6 +335,8 @@ export default function ClassUI() {
               <p className="text-center text-sm text-gray-600">Idade: {selectedAluno.Idade || 'N/A'}</p>
               
               <hr className="my-4"/>
+              
+              {/* Lógica de Observações */}
               <h3 className="font-bold">Observações do Professor</h3>
               <form onSubmit={handleSalvarObservacao}>
                 <textarea 
@@ -319,21 +350,23 @@ export default function ClassUI() {
                   Salvar Observação
                 </button>
               </form>
-
-              {/* Lógica de Laudo (Mantida) */}
+              
+              {/* Lógica de Laudos (NOVA IMPLEMENTAÇÃO) */}
               <hr className="my-4"/>
-              <label className="block mt-4">Possui laudo?</label>
-              <select value={temLaudo} onChange={(e) => setTemLaudo(e.target.value)} className="border p-2 rounded w-full">
-                <option value="não">Não</option>
-                <option value="sim">Sim</option>
-              </select>
-              {temLaudo === "sim" && (
-                <div className="mt-4">
-                  <label className="block mb-2">Tipo de Neurodivergência (Placeholder):</label>
-                  <select multiple className="border p-2 rounded w-full h-24">
-                    {neurodivs.map((n) => (<option key={n} value={n}>{n}</option>))}
-                  </select>
-                </div>
+              <h3 className="font-bold">Condições Médicas</h3>
+              
+              {/* Exibição das condições existentes */}
+              {selectedAluno.condicoes && selectedAluno.condicoes.length > 0 ? (
+                  <div className="space-y-2 mt-2">
+                      {selectedAluno.condicoes.map((condicao) => (
+                          <div key={condicao.id} className="p-3 bg-gray-200 rounded-lg">
+                              <p className="font-medium">{condicao.nomeCondicao}</p>
+                              <p className="text-xs text-gray-600">Status: {condicao.statusComprovacao}</p>
+                          </div>
+                      ))}
+                  </div>
+              ) : (
+                  <p className="text-sm text-gray-500 mt-2">Nenhuma condição cadastrada.</p>
               )}
             </div>
 
@@ -369,7 +402,7 @@ export default function ClassUI() {
                                     <input
                                       type="number"
                                       min="0" max="10" step="0.1"
-                                      className="border p-1 w-12 text-center rounded"
+                                      className="border p-1 w-12 text-sm"
                                       value={nota.nota || ''}
                                       onChange={(e) => handleNotaChange(materia.id, bimestre, 'nota', e.target.value)}
                                       disabled={loadingAlunoData}
@@ -406,7 +439,7 @@ export default function ClassUI() {
                   <select 
                     className="border p-2 rounded flex-1"
                     value={novaAvaliacao.atividadeId}
-                    onChange={(e) => setNovaAvaliacao(prev => ({ ...prev, atividadeId: e.target.value }))}
+                    onChange={handleAvaliacaoSelectChange}
                     disabled={loadingAlunoData}
                     required
                   >
@@ -441,12 +474,12 @@ export default function ClassUI() {
                 
                 {/* Campo "Observações sobre o Prazo/Entrega" */}
                 <div className="flex flex-col gap-1 mb-4">
-                  <label htmlFor="observacaoPrazo" className="text-sm font-medium">Observações sobre o Prazo/Entrega:</label>
+                  <label htmlFor="entregouNoPrazo" className="text-sm font-medium">Observações sobre o Prazo/Entrega:</label>
                   <textarea 
-                    id="observacaoPrazo"
+                    id="entregouNoPrazo"
                     placeholder="Ex: Entregue com 1 dia de atraso. Baseado neste campo, o sistema deduz se foi entregue no prazo."
-                    value={novaAvaliacao.observacaoPrazo}
-                    onChange={(e) => setNovaAvaliacao(prev => ({ ...prev, observacaoPrazo: e.target.value }))}
+                    value={novaAvaliacao.entregouNoPrazo}
+                    onChange={(e) => setNovaAvaliacao(prev => ({ ...prev, entregouNoPrazo: e.target.value }))}
                     disabled={loadingAlunoData}
                     className="border p-2 rounded text-sm w-full"
                     rows={1}
