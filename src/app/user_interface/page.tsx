@@ -11,6 +11,7 @@ import ClassManager from "@/components/AdminUI/Class/ClassManager";
 import StudentManager from "@/components/AdminUI/Student/StudentManager";
 import SubjectManager from "@/components/AdminUI/Subject/SubjectManager";
 import ActivitiesManager from "@/components/AdminUI/Activitie/ActivitiesManager";
+import InsightManager from "@/components/AdminUI/Insights/InsightManager";
 
 export default function UserInterface() {
   const [selected, setSelected] = useState<string>('Área da Turma');
@@ -35,7 +36,7 @@ export default function UserInterface() {
   const contentMap: Record<string, JSX.Element> = {
     // Professor
     "Área da Turma": <ClassUI/>,
-    "Gerar Insight": <div>💡 Ferramenta de Insights</div>,
+    "Gerar Insight": <InsightManager/>,
     "Gerir Atividades": <ActivitiesManager/>,
     "Comunicação": <div>💬 Painel de Comunicação</div>,
 
