@@ -1,86 +1,90 @@
 'use client';
-
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 
-// --- DEFINIÇÃO DE TIPOS CENTRALIZADA ---
-// Usamos a interface Docente como tipo base para o usuário autenticado
-export interface Docente {
-  id: string; // O UUID do Prisma é uma string
+// Interface para o usuário autenticado
+interface AuthUser {
+  id: string;
   nome: string;
-  email: string | null; // Corrigido para aceitar null
-  registro: string;
-  cpf: string;
-  materia: string;
-  turmas: string[];
-  acesso: {
-      id: string;
-      nome: string;
-  };
+  acesso: string; // O nome da role (Ex: 'Administrador')
 }
 
-// O tipo de usuário no contexto de auth pode ser um Docente completo,
-// mas apenas com os campos necessários para a UI
-type AuthUser = Pick<Docente, 'id' | 'nome' | 'acesso'>;
-
+// Interface do contexto de autenticação
 interface AuthContextType {
-  token: string | null;
   user: AuthUser | null;
+  token: string | null;
   isLoggedIn: boolean;
-  login: (token: string, userData: AuthUser) => void;
+  isLoadingAuth: boolean;
+  login: (jwtToken: string, userData: AuthUser) => void; // CORRIGIDO: Agora aceita userData
   logout: () => void;
   API_BASE_URL: string;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// URL da sua API de autenticação.
-const API_BASE_URL = 'http://localhost:4000'; 
-
-interface AuthProviderProps {
-  children: ReactNode;
-}
-
-export const AuthProvider = ({ children }: AuthProviderProps) => {
-  const [token, setToken] = useState<string | null>(null);
+export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<AuthUser | null>(null);
-  const isLoggedIn = !!token;
-  const router = useRouter(); 
+  const [token, setToken] = useState<string | null>(null);
+  const [isLoadingAuth, setIsLoadingAuth] = useState(true);
+  const router = useRouter();
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
-  // Efeito para carregar o estado do localStorage na inicialização
-  useEffect(() => {
-    const storedToken = localStorage.getItem('authToken');
-    const storedUser = localStorage.getItem('authUser');
-
-    if (storedToken && storedUser) {
+  // Função helper para decodificar JWT e extrair o usuário (Usado apenas no useEffect)
+  const decodeUserFromJWT = (jwtToken: string): AuthUser | null => {
       try {
-        setToken(storedToken);
-        setUser(JSON.parse(storedUser));
-      } catch (e) {
-        localStorage.removeItem('authToken');
-        localStorage.removeItem('authUser');
+          const payload = JSON.parse(atob(jwtToken.split('.')[1]));
+          
+          if (payload.user && payload.user.acesso) {
+              return {
+                  id: payload.user.id,
+                  nome: payload.user.nome,
+                  acesso: payload.user.acesso, // String (ex: 'Administrador')
+              };
+          }
+          return null;
+      } catch (error) {
+          return null;
       }
-    }
-  }, []);
+  };
 
-  const login = (newToken: string, userData: AuthUser) => {
-    setToken(newToken);
+  // FUNÇÃO DE LOGIN CORRIGIDA
+  const login = (jwtToken: string, userData: AuthUser) => {
+    localStorage.setItem('token', jwtToken);
+    localStorage.setItem('user', JSON.stringify(userData)); // Salva o objeto usuário
+    
+    setToken(jwtToken);
     setUser(userData);
-    localStorage.setItem('authToken', newToken);
-    localStorage.setItem('authUser', JSON.stringify(userData));
-    router.push('/user_interface');
   };
 
   const logout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user'); // Remove o objeto usuário
     setToken(null);
     setUser(null);
-    localStorage.removeItem('authToken');
-    localStorage.removeItem('authUser');
-    router.push('/'); 
+    router.push('/');
   };
 
+  useEffect(() => {
+    const storedToken = localStorage.getItem('token');
+    const storedUser = localStorage.getItem('user'); // Lê o objeto usuário salvo
+    
+    if (storedToken && storedUser) {
+      try {
+        const userData = JSON.parse(storedUser) as AuthUser;
+        // O token é apenas para fins de API, o user é o que usamos para autenticar
+        setUser(userData); 
+        setToken(storedToken);
+      } catch (error) {
+        console.error("Dados de usuário armazenados inválidos.", error);
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+      }
+    }
+    setIsLoadingAuth(false);
+  }, []);
+
   return (
-    <AuthContext.Provider value={{ token, user, isLoggedIn, login, logout, API_BASE_URL }}>
+    <AuthContext.Provider value={{ user, token, isLoggedIn: !!token, isLoadingAuth, login, logout, API_BASE_URL }}>
       {children}
     </AuthContext.Provider>
   );
@@ -89,7 +93,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    throw new Error('useAuth deve ser usado dentro de um AuthProvider');
   }
   return context;
 };
