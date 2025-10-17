@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 
 // --- INTERFACES DE DADOS ---
-interface Turma { id: string; Nome: string; }
+interface Turma { id: string; Nome: string; escolaId: string; } // Adicionado escolaId
 interface Materia { id: string; nome: string; }
 interface Atividade { id: string; tipo: string; materia: Materia; notaMaxima: number; }
 interface Observacao { id: string; texto: string; professorId: string; data: string; }
@@ -18,7 +18,7 @@ interface CondicaoAluno {
 interface Aluno {
   id: string; Nome: string; Matricula: string; Idade: number; turmaId: string;
   turma: { Nome: string; id: string; };
-  condicoes: CondicaoAluno[];
+  condicao: CondicaoAluno[];
 }
 
 interface NotaBimestral {
@@ -34,7 +34,6 @@ interface Avaliacao {
   id: string;
   notaNumerica: number;
   avaliacaoEscrita: string | null;
-  // CORRIGIDO: O campo é uma string
   entregouNoPrazo: string | null; 
   atividadeId: string;
   alunoId: string;
@@ -43,13 +42,16 @@ interface Avaliacao {
 
 // O componente principal
 export default function ClassUI() {
-  const { API_BASE_URL, token, user } = useAuth();
+  // Inclui viewingSchoolId para filtro e user
+  const { API_BASE_URL, token, user, viewingSchoolId } = useAuth(); 
   const router = useRouter();
 
   const [turmas, setTurmas] = useState<Turma[]>([]);
   const [alunos, setAlunos] = useState<Aluno[]>([]);
   const [materias, setMaterias] = useState<Materia[]>([]);
   const [atividades, setAtividades] = useState<Atividade[]>([]);
+  
+  // ESTADO FIXO E SELECIONADO: IDs e Objeto Aluno
   const [selectedTurmaId, setSelectedTurmaId] = useState('');
   const [selectedAluno, setSelectedAluno] = useState<Aluno | null>(null);
 
@@ -70,28 +72,62 @@ export default function ClassUI() {
     loading: false,
   });
 
-  const fetchDependencies = useCallback(async () => {
-    if (!token) return;
-    setLoading(true);
-    try {
-      const [turmasRes, alunosRes, materiasRes, atividadesRes] = await Promise.all([
-        fetch(`${API_BASE_URL}/api/turmas`, { headers: { Authorization: `Bearer ${token}` } }),
-        fetch(`${API_BASE_URL}/api/alunos`, { headers: { Authorization: `Bearer ${token}` } }),
-        fetch(`${API_BASE_URL}/api/materias`, { headers: { Authorization: `Bearer ${token}` } }),
-        fetch(`${API_BASE_URL}/api/atividades`, { headers: { Authorization: `Bearer ${token}` } }),
-      ]);
+   // Função centralizada de busca (agora usa o viewingSchoolId)
+  const fetchDependencies = useCallback(async () => {
+    if (!token) return;
 
-      if (turmasRes.ok) setTurmas(await turmasRes.json());
-      if (alunosRes.ok) setAlunos(await alunosRes.json());
-      if (materiasRes.ok) setMaterias(await materiasRes.json());
-      if (atividadesRes.ok) setAtividades(await atividadesRes.json());
-    } catch (err) {
-      console.error('Erro ao buscar dados:', err);
-      setError('Falha ao carregar dados iniciais.');
-    } finally {
-      setLoading(false);
-    }
-  }, [API_BASE_URL, token]);
+    // 1. Determina o ID de filtro
+    const escolaIdParaFiltrar = user?.acesso === 'Administrador' ? viewingSchoolId : user?.escolaId;
+
+    // Se o ID de filtro não for válido, bloqueia a busca (Admin sem seleção)
+    if (!escolaIdParaFiltrar) {
+        setTurmas([]);
+        setAlunos([]);
+        setMaterias([]);
+        setAtividades([]);
+        setLoading(false);
+        return;
+    }
+    
+    setLoading(true);
+    setError(null);
+    try {
+      // Monta a URL de filtro para Turmas, Alunos, Matérias e Atividades
+      const urlQuery = `?viewingSchoolId=${escolaIdParaFiltrar}`;
+      const turmaUrl = `${API_BASE_URL}/api/turmas${urlQuery}`;
+      const alunosUrl = `${API_BASE_URL}/api/alunos${urlQuery}`;
+      const materiasUrl = `${API_BASE_URL}/api/materias${urlQuery}`;
+      // CORRIGIDO: Adicionando o filtro de escola para a rota de Atividades
+      const atividadesUrl = `${API_BASE_URL}/api/atividades${urlQuery}`; 
+
+      const [turmasRes, alunosRes, materiasRes, atividadesRes] = await Promise.all([
+        fetch(turmaUrl, { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(alunosUrl, { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(materiasUrl, { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(atividadesUrl, { headers: { Authorization: `Bearer ${token}` } }),
+      ]);
+
+      if (turmasRes.ok) setTurmas(await turmasRes.json());
+      if (alunosRes.ok) setAlunos(await alunosRes.json());
+      if (materiasRes.ok) setMaterias(await materiasRes.json());
+      if (atividadesRes.ok) setAtividades(await atividadesRes.json());
+      
+      // Reseta a seleção se a turma atual não pertencer à nova lista (após o Admin trocar de escola)
+      if (selectedTurmaId && !turmas.some(t => t.id === selectedTurmaId)) {
+          setSelectedTurmaId('');
+          setSelectedAluno(null);
+      }
+
+    } catch (err) {
+      console.error('Erro ao buscar dados:', err);
+      setError('Falha ao carregar dados iniciais.');
+    } finally {
+      setLoading(false);
+    }
+  }, [API_BASE_URL, token, user?.acesso, user?.escolaId, viewingSchoolId, selectedTurmaId]); // Dependências
+
+  // Re-executa o fetchDependencies sempre que o token ou o filtro de escola mudar
+  useEffect(() => { fetchDependencies(); }, [fetchDependencies]);
 
   const fetchAlunoData = useCallback(async (alunoId: string) => {
     if (!token || !alunoId) return;
@@ -117,7 +153,6 @@ export default function ClassUI() {
     }
   }, [API_BASE_URL, token]);
 
-  useEffect(() => { fetchDependencies(); }, [fetchDependencies]);
   useEffect(() => { if (selectedAluno) fetchAlunoData(selectedAluno.id); }, [selectedAluno, fetchAlunoData]);
 
 
@@ -204,7 +239,6 @@ export default function ClassUI() {
         atividadeId: avaliacaoExistente.atividadeId,
         notaNumerica: avaliacaoExistente.notaNumerica,
         avaliacaoEscrita: avaliacaoExistente.avaliacaoEscrita || '',
-        // CORRIGIDO: Lê o campo entregouNoPrazo que o backend DEVE retornar como string
         entregouNoPrazo: avaliacaoExistente.entregouNoPrazo || '',
         error: '',
         loading: false,
@@ -216,7 +250,7 @@ export default function ClassUI() {
         atividadeId: atividadeId,
         notaNumerica: '' as number | '',
         avaliacaoEscrita: '',
-        entregouNoPrazo: '',
+        entregouNoPrazo: '', 
         error: '',
         loading: false,
       }));
@@ -232,7 +266,6 @@ export default function ClassUI() {
         atividadeId: novaAvaliacao.atividadeId,
         notaNumerica: Number(novaAvaliacao.notaNumerica),
         avaliacaoEscrita: novaAvaliacao.avaliacaoEscrita,
-        // CORRIGIDO: O campo entregouNoPrazo é uma string
         entregouNoPrazo: novaAvaliacao.entregouNoPrazo, 
         professorId: user?.id,
     };
@@ -263,6 +296,11 @@ export default function ClassUI() {
     ? alunos.filter((aluno) => aluno.turmaId === selectedTurmaId)
     : [];
 
+  const handleTurmaChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+      setSelectedTurmaId(e.target.value);
+      setSelectedAluno(null); // Reseta o aluno selecionado
+  };
+
   const handleSelectAluno = (alunoId: string) => {
     const aluno = alunos.find((a) => a.id === alunoId);
     setSelectedAluno(aluno || null);
@@ -276,54 +314,63 @@ export default function ClassUI() {
   if (error) { return <p className="text-center p-8 text-red-500">Erro: {error}</p>; }
 
   return (
-    <div className="p-6">
-      <div className="flex gap-4">
-        {/* Seleção de Turma */}
-        <div>
-          <label className="block mb-2 font-bold">Selecione a Turma:</label>
-          <select
-            value={selectedTurmaId}
-            onChange={(e) => {
-              setSelectedTurmaId(e.target.value);
-              setSelectedAluno(null);
-            }}
-            className="border p-2 rounded w-64"
-          >
-            <option value="">-- Nenhuma --</option>
-            {turmas.map((turma) => (
-              <option key={turma.id} value={turma.id}>
-                {turma.Nome}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {/* Seleção de Aluno */}
-        {selectedTurmaId && (
+    <div className="min-h-screen">
+      {/* CABEÇALHO FIXO: Seleção de Turma e Aluno */}
+      <div className="sticky top-0 z-10 bg-white p-4 mb-6 border-b shadow-md">
+        <div className="flex gap-4 items-center px-6"> 
+          
+          {/* Seleção de Turma */}
           <div>
-            <label className="block mb-2 font-bold">Selecione o Aluno:</label>
+            <label className="block mb-1 text-sm font-bold">Turma:</label>
             <select
-              value={selectedAluno?.id || ''}
-              onChange={(e) => handleSelectAluno(e.target.value)}
-              className="border p-2 rounded w-64"
-              disabled={loadingAlunoData}
+              value={selectedTurmaId}
+              onChange={handleTurmaChange}
+              className="border p-2 rounded w-48"
             >
-              <option value="">-- Nenhum --</option>
-              {alunosDaTurma.map((aluno) => (
-                <option key={aluno.id} value={aluno.id}>
-                  {aluno.Nome}
+              <option value="">-- Selecione --</option>
+              {turmas.map((turma) => (
+                <option key={turma.id} value={turma.id}>
+                  {turma.Nome}
                 </option>
               ))}
             </select>
           </div>
-        )}
+
+          {/* Seleção de Aluno */}
+          {selectedTurmaId && (
+            <div>
+              <label className="block mb-1 text-sm font-bold">Aluno:</label>
+              <select
+                value={selectedAluno?.id || ''}
+                onChange={(e) => handleSelectAluno(e.target.value)}
+                className="border p-2 rounded w-48"
+                disabled={loadingAlunoData || alunosDaTurma.length === 0}
+              >
+                <option value="">-- Selecione --</option>
+                {alunosDaTurma.map((aluno) => (
+                  <option key={aluno.id} value={aluno.id}>
+                    {aluno.Nome}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* Exibição do Nome do Aluno Selecionado (Simplesmente para fixar a informação) */}
+          {selectedAluno && (
+              <h2 className="ml-auto text-xl font-extrabold text-green-700">
+                  {selectedAluno.Nome}
+              </h2>
+          )}
+        </div>
       </div>
+      {/* FIM CABEÇALHO FIXO */}
 
       {/* Conteúdo do Aluno */}
       <AnimatePresence>
-        {selectedAluno && (
+        {selectedAluno ? (
           <motion.div
-            className="mt-6 flex gap-8"
+            className="p-6 flex gap-8" // Adicionado p-6 aqui para o conteúdo
             initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 15 }}
@@ -351,14 +398,13 @@ export default function ClassUI() {
                 </button>
               </form>
               
-              {/* Lógica de Laudos (NOVA IMPLEMENTAÇÃO) */}
+              {/* Lógica de Laudos */}
               <hr className="my-4"/>
               <h3 className="font-bold">Condições Médicas</h3>
               
-              {/* Exibição das condições existentes */}
-              {selectedAluno.condicoes && selectedAluno.condicoes.length > 0 ? (
+              {selectedAluno.condicao && selectedAluno.condicao.length > 0 ? (
                   <div className="space-y-2 mt-2">
-                      {selectedAluno.condicoes.map((condicao) => (
+                      {selectedAluno.condicao.map((condicao) => (
                           <div key={condicao.id} className="p-3 bg-gray-200 rounded-lg">
                               <p className="font-medium">{condicao.nomeCondicao}</p>
                               <p className="text-xs text-gray-600">Status: {condicao.statusComprovacao}</p>
@@ -481,7 +527,7 @@ export default function ClassUI() {
                     value={novaAvaliacao.entregouNoPrazo}
                     onChange={(e) => setNovaAvaliacao(prev => ({ ...prev, entregouNoPrazo: e.target.value }))}
                     disabled={loadingAlunoData}
-                    className="border p-2 rounded text-sm w-full"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-green-400 focus:outline-none"
                     rows={1}
                   />
                 </div>
@@ -492,6 +538,10 @@ export default function ClassUI() {
               </form>
             </div>
           </motion.div>
+        ) : (
+             <p className="mt-8 text-lg text-gray-600 text-center">
+                 Selecione uma turma e um aluno acima para visualizar e gerenciar os dados.
+             </p>
         )}
       </AnimatePresence>
     </div>

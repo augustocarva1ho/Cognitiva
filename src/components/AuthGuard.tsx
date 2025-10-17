@@ -12,16 +12,9 @@ const AuthGuard: React.FC<AuthGuardProps> = ({ Component, allowedRoles }) => {
   const { isLoggedIn, user, isLoadingAuth } = useAuth(); 
   const router = useRouter();
 
-  // Log de estado no render (ATUALIZADO)
-  console.log(`[AuthGuard Render] Loading: ${isLoadingAuth} | LoggedIn: ${isLoggedIn} | User Role: ${user?.acesso}`);
-
   // 1. Redirecionamento e verificação de permissões
   useEffect(() => {
     const userRole = user?.acesso; 
-
-    // Log detalhado do início do efeito (ATUALIZADO)
-    console.log(`[AuthGuard Effect] Estado: Loading=${isLoadingAuth}, LoggedIn=${isLoggedIn}, Role=${userRole}`);
-
 
     // 1. Não tome decisões até que o carregamento do token termine.
     if (isLoadingAuth) {
@@ -41,9 +34,6 @@ const AuthGuard: React.FC<AuthGuardProps> = ({ Component, allowedRoles }) => {
       router.push('/unauthorized'); 
       return;
     }
-    
-    // 4. SUCESSO
-    console.log(`[AuthGuard Effect] SUCESSO. Permissão concedida para role: ${userRole}`);
 
   }, [isLoggedIn, user, allowedRoles, router, isLoadingAuth]);
 

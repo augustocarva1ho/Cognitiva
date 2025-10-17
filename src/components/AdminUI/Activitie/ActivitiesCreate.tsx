@@ -1,157 +1,213 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { useRouter } from 'next/navigation';
+import { useRouter } from "next/navigation";
 
-// Tipos base
-interface Materia {
-  id: string;
-  nome: string;
-}
 
-interface Docente {
-  id: string;
-  nome: string;
-}
+// Tipos auxiliares (reintroduzidos localmente)
+interface Materia { id: string; nome: string; }
+// Reintroduzindo a interface Professor
+interface Professor { id: string; nome: string; registro: string; } 
 
 interface ActivityCreateProps {
-  onCreated: () => void;
-  onCancel: () => void;
+    escolaId: string | null | undefined; // O ID da escola atualmente selecionada pelo Admin ou do usuário
+    onCreated: () => void;
+    onCancel: () => void;
 }
 
-// O tipo do formulário
+// Tipos para o formulário
 interface FormData {
-  tipo: string;
-  local: string;
-  tempoFinalizacao: string;
-  dinamica: string;
-  comConsulta: boolean;
-  liberdadeCriativa: boolean;
-  notaMaxima: number | '';
-  materiaId: string;
-  professorId: string;
-  descricaoAdicional: string;
+    tipo: string;
+    local: string;
+    tempoFinalizacao: string;
+    dinamica: string;
+    comConsulta: boolean;
+    liberdadeCriativa: boolean;
+    descricaoAdicional: string;
+    notaMaxima: number;
+    materiaId: string;
+    professorId: string;
 }
 
-export default function ActivityCreate({ onCreated, onCancel }: ActivityCreateProps) {
-  const { API_BASE_URL, token } = useAuth();
-  const [formData, setFormData] = useState<FormData>({
-    tipo: "",
-    local: "",
-    tempoFinalizacao: "",
-    dinamica: "",
+// Estado inicial do formulário
+const initialFormData: FormData = {
+    tipo: 'Prova',
+    local: '',
+    tempoFinalizacao: '',
+    dinamica: 'Individual',
     comConsulta: false,
     liberdadeCriativa: false,
-    notaMaxima: '',
-    materiaId: "",
-    professorId: "",
-    descricaoAdicional: "",
-  });
-  const [materias, setMaterias] = useState<Materia[]>([]);
-  const [professores, setProfessores] = useState<Docente[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [loadingDependencies, setLoadingDependencies] = useState(true);
-  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+    descricaoAdicional: '',
+    notaMaxima: 10,
+    materiaId: '',
+    professorId: '',
+};
 
-  // UseEffect para buscar matérias e professores
-  useEffect(() => {
-    const fetchDependencies = async () => {
-        setLoadingDependencies(true);
-        if (!token) {
-          setLoadingDependencies(false);
-          return;
+export default function ActivityCreate({ escolaId, onCreated, onCancel }: ActivityCreateProps) {
+    const { API_BASE_URL, token, user } = useAuth();
+    
+    // O ID da escola deve vir da prop, garantindo que o Admin use o viewingSchoolId
+    const currentEscolaId = escolaId;
+    
+    const [formData, setFormData] = useState<FormData>({
+        ...initialFormData,
+        professorId: user?.acesso === 'Professor' ? (user?.id || '') : initialFormData.professorId // Define o professor logado como padrão se for Professor
+    });
+    const [materias, setMaterias] = useState<Materia[]>([]);
+    const [professores, setProfessores] = useState<Professor[]>([]); // Reintroduzido o estado de professores
+    const [loading, setLoading] = useState(false);
+    const [loadingResources, setLoadingResources] = useState(true);
+    const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+    const isAdmin = user?.acesso === 'Administrador';
+    const isProfessor = user?.acesso === 'Professor'; 
+
+    // Se for professor, ele só pode criar atividades para si mesmo (definição obrigatória)
+    useEffect(() => {
+        if (isProfessor && user?.id) {
+            // Se o usuário é professor, o professorId deve ser o seu próprio ID
+            setFormData(prev => ({ ...prev, professorId: user.id }));
+        }
+    }, [isProfessor, user?.id]);
+
+
+    const fetchResources = useCallback(async () => {
+        if (!token || !currentEscolaId) {
+            setLoadingResources(false);
+            return;
         }
         
         try {
+            // URLs com filtro pela escola atual (viewingSchoolId)
+            const materiasUrl = `${API_BASE_URL}/api/materias?viewingSchoolId=${currentEscolaId}`;
+            const professoresUrl = `${API_BASE_URL}/api/docentes?viewingSchoolId=${currentEscolaId}`;
+            
             const [materiasRes, professoresRes] = await Promise.all([
-                fetch(`${API_BASE_URL}/api/materias`, { headers: { 'Authorization': `Bearer ${token}` } }),
-                fetch(`${API_BASE_URL}/api/docentes`, { headers: { 'Authorization': `Bearer ${token}` } }),
+                fetch(materiasUrl, { headers: { Authorization: `Bearer ${token}` } }),
+                fetch(professoresUrl, { headers: { Authorization: `Bearer ${token}` } }),
             ]);
 
+            // 1. Matérias
             if (materiasRes.ok) {
-                const data = await materiasRes.json();
-                setMaterias(data);
-                if (data.length > 0) setFormData(prev => ({ ...prev, materiaId: data[0].id }));
+                const fetchedMaterias: Materia[] = await materiasRes.json();
+                setMaterias(fetchedMaterias);
+                if (fetchedMaterias.length > 0 && !formData.materiaId) {
+                    setFormData(prev => ({ ...prev, materiaId: fetchedMaterias[0].id }));
+                }
+            } else {
+                console.error("Erro ao buscar matérias:", materiasRes.status);
             }
+
+            // 2. Professores (Filtrados pela escola)
             if (professoresRes.ok) {
-                const data = await professoresRes.json();
-                setProfessores(data);
-                if (data.length > 0) setFormData(prev => ({ ...prev, professorId: data[0].id }));
+                const fetchedProfessores: Professor[] = await professoresRes.json();
+                setProfessores(fetchedProfessores);
+                
+                // Lógica de seleção: Se não for professor (Admin/Supervisor), tenta selecionar o primeiro
+                if (!isProfessor && fetchedProfessores.length > 0 && !formData.professorId) {
+                    setFormData(prev => ({ ...prev, professorId: fetchedProfessores[0].id }));
+                }
+            } else {
+                 console.error("Erro ao buscar professores:", professoresRes.status);
             }
         } catch (error) {
-            console.error('Erro ao buscar matérias/professores:', error);
-            setMessage({ type: 'error', text: 'Não foi possível carregar as opções de matéria e professor.' });
+            setMessage({ type: 'error', text: 'Não foi possível carregar as Matérias/Professores.' });
         } finally {
-            setLoadingDependencies(false);
+            setLoadingResources(false);
+        }
+    }, [API_BASE_URL, token, currentEscolaId, isProfessor, formData.materiaId, formData.professorId]);
+    useEffect(() => {
+        fetchResources();
+    }, [fetchResources]);
+
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+        const { name, value, type } = e.target;
+        
+        setFormData((prev) => ({ 
+            ...prev, 
+            [name]: type === 'checkbox' ? (e.target as HTMLInputElement).checked : value 
+        }));
+        setMessage(null);
+    };
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        
+        if (!token || !currentEscolaId) {
+            setMessage({ type: 'error', text: 'Selecione uma escola válida para cadastrar.' });
+            return;
+        }
+        
+        if (!formData.materiaId || !formData.professorId) {
+            setMessage({ type: 'error', text: 'Matéria e Professor Responsável são obrigatórios.' });
+            return;
+        }
+
+        setLoading(true);
+        setMessage(null);
+
+        try {
+            const payload = {
+                ...formData,
+                notaMaxima: Number(formData.notaMaxima),
+                escolaId: currentEscolaId, // Passando o ID da escola selecionada na prop
+            };
+            
+            // O Admin precisa enviar o viewingSchoolId como query param para o backend validar
+            const queryParam = isAdmin ? `?viewingSchoolId=${currentEscolaId}` : '';
+
+            const response = await fetch(`${API_BASE_URL}/api/atividades${queryParam}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify(payload),
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || `Erro de servidor ao cadastrar atividade: ${response.status}`);
+            }
+
+            setMessage({ type: 'success', text: 'Atividade cadastrada com sucesso!' });
+            // Não resetamos formData para initialFormData, para manter o professorId (se for professor)
+            // mas limpamos os campos específicos da atividade
+            setFormData(prev => ({ 
+                ...initialFormData, 
+                professorId: prev.professorId, 
+                materiaId: prev.materiaId // Mantém a matéria selecionada
+            })); 
+            setTimeout(onCreated, 1500);
+
+        } catch (err) {
+            const errorText = err instanceof Error ? err.message : 'Erro desconhecido ao cadastrar.';
+            setMessage({ type: 'error', text: errorText });
+        } finally {
+            setLoading(false);
         }
     };
-    fetchDependencies();
-  }, [API_BASE_URL, token]);
-  
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-    const { name, value, type } = e.target;
-    let finalValue: string | number | boolean = value;
 
-    if (type === 'checkbox') {
-      finalValue = (e.target as HTMLInputElement).checked;
-    } else if (name === 'notaMaxima' && value !== '') {
-      finalValue = Number(value);
+    const messageClass = message 
+        ? message.type === 'success' 
+            ? 'bg-green-100 border-green-400 text-green-700' 
+            : 'bg-red-100 border-red-400 text-red-700' 
+        : '';
+
+    const isFormDisabled = loading || loadingResources || !currentEscolaId;
+    const canCreate = !isFormDisabled && (user?.acesso === 'Administrador' || user?.acesso === 'Supervisor' || user?.acesso === 'Professor');
+
+    if (!currentEscolaId) {
+        return (
+            <div className="w-full max-w-xl mx-auto p-8 bg-white rounded-2xl shadow-xl mt-4 text-center">
+                <h2 className="text-2xl font-bold text-red-600 mb-6">Aguardando Seleção</h2>
+                <p className="text-gray-700">O Administrador precisa selecionar uma escola para cadastrar atividades.</p>
+                <button 
+                    onClick={onCancel} 
+                    className="mt-4 bg-gray-300 text-gray-700 font-semibold py-2 px-6 rounded-xl hover:bg-gray-400 transition-colors"
+                >
+                    Voltar
+                </button>
+            </div>
+        );
     }
-    
-    setFormData((prev) => ({ ...prev, [name]: finalValue }));
-    setMessage(null);
-  };
-  
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!token) {
-      setMessage({ type: 'error', text: 'Sessão expirada. Faça login novamente.' });
-      return;
-    }
-    
-    setLoading(true);
-    setMessage(null);
-
-    const payload = { ...formData, notaMaxima: Number(formData.notaMaxima) };
-
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/atividades`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || `Erro de servidor: ${response.status}`);
-      }
-
-      setMessage({ type: 'success', text: 'Atividade cadastrada com sucesso!' });
-      
-      setFormData({
-        tipo: "", local: "", tempoFinalizacao: "", dinamica: "", comConsulta: false,
-        liberdadeCriativa: false, notaMaxima: '', materiaId: "", professorId: "", descricaoAdicional: ""
-      });
-      
-      setTimeout(onCreated, 1500); 
-
-    } catch (err) {
-      const errorText = err instanceof Error ? err.message : 'Erro desconhecido ao cadastrar.';
-      setMessage({ type: 'error', text: errorText });
-    } finally {
-      setLoading(false);
-    }
-  };
-  
-  const messageClass = message 
-    ? message.type === 'success' 
-      ? 'bg-green-100 border-green-400 text-green-700'
-      : 'bg-red-100 border-red-400 text-red-700'
-    : '';
-
   return (
     <div className="w-full max-w-2xl mx-auto bg-white rounded-2xl shadow-xl p-8 mt-4">
       <h2 className="text-2xl font-bold text-green-500 mb-6 text-center">Cadastrar Nova Atividade</h2>
@@ -170,7 +226,7 @@ export default function ActivityCreate({ onCreated, onCancel }: ActivityCreatePr
           <select
             id="tipo" name="tipo" value={formData.tipo} onChange={handleChange} required
             className="w-full px-3 py-2 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-green-400 focus:outline-none"
-            disabled={loadingDependencies || loading}
+            disabled={isFormDisabled}
           >
             <option value="">Selecione...</option>
             <option value="Prova">Prova</option>
@@ -187,7 +243,7 @@ export default function ActivityCreate({ onCreated, onCancel }: ActivityCreatePr
             <label htmlFor="local" className="block text-sm font-medium text-gray-700 mb-1">Local</label>
             <select id="local" name="local" value={formData.local} onChange={handleChange} required
               className="w-full px-3 py-2 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-green-400 focus:outline-none"
-              disabled={loadingDependencies || loading}
+              disabled={isFormDisabled}
             >
               <option value="">Selecione...</option>
               <option value="Em sala">Em Sala</option>
@@ -201,14 +257,14 @@ export default function ActivityCreate({ onCreated, onCancel }: ActivityCreatePr
             <label htmlFor="tempoFinalizacao" className="block text-sm font-medium text-gray-700 mb-1">Tempo Finalização</label>
             <input type="text" id="tempoFinalizacao" name="tempoFinalizacao" value={formData.tempoFinalizacao} onChange={handleChange} required
               className="w-full px-3 py-2 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-green-400 focus:outline-none"
-              disabled={loadingDependencies || loading}
+              disabled={isFormDisabled}
             />
           </div>
           <div>
             <label htmlFor="dinamica" className="block text-sm font-medium text-gray-700 mb-1">Dinâmica</label>
             <select id="dinamica" name="dinamica" value={formData.dinamica} onChange={handleChange} required
               className="w-full px-3 py-2 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-green-400 focus:outline-none"
-              disabled={loadingDependencies || loading}
+              disabled={isFormDisabled}
             >
               <option value="">Selecione...</option>
               <option value="Individual">Individual</option>
@@ -225,7 +281,7 @@ export default function ActivityCreate({ onCreated, onCancel }: ActivityCreatePr
             <select
               id="materiaId" name="materiaId" value={formData.materiaId} onChange={handleChange} required
               className="w-full px-3 py-2 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-green-400 focus:outline-none"
-              disabled={loadingDependencies || loading}
+              disabled={isFormDisabled}
             >
               <option value="">Selecione...</option>
               {materias.map(m => <option key={m.id} value={m.id}>{m.nome}</option>)}
@@ -233,20 +289,30 @@ export default function ActivityCreate({ onCreated, onCancel }: ActivityCreatePr
           </div>
           <div>
             <label htmlFor="professorId" className="block text-sm font-medium text-gray-700 mb-1">Professor</label>
-            <select
-              id="professorId" name="professorId" value={formData.professorId} onChange={handleChange} required
-              className="w-full px-3 py-2 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-green-400 focus:outline-none"
-              disabled={loadingDependencies || loading}
-            >
-              <option value="">Selecione...</option>
-              {professores.map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}
+            <select id="professorId" name="professorId" value={formData.professorId} onChange={handleChange} required
+                // Desabilita se for Professor logado (sempre atribui a si mesmo)
+                disabled={isProfessor || isFormDisabled} 
+                className={`w-full px-3 py-2 border rounded-xl shadow-sm focus:ring-green-400 focus:outline-none ${isProfessor || isFormDisabled ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'}`}>
+                
+                <option value="">Selecione o Professor</option>
+                {professores.map(p => (
+                    <option 
+                        key={p.id} 
+                        value={p.id}
+                    >
+                        {p.nome} ({p.registro})
+                    </option>
+                ))}
             </select>
+            {isProfessor && user?.nome && (
+              <p className="text-xs text-gray-500 mt-1">Atribuído automaticamente a você.</p>
+            )}
           </div>
           <div>
             <label htmlFor="notaMaxima" className="block text-sm font-medium text-gray-700 mb-1">Nota Máxima</label>
             <input type="number" id="notaMaxima" name="notaMaxima" value={formData.notaMaxima} onChange={handleChange} required
               className="w-full px-3 py-2 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-green-400 focus:outline-none"
-              disabled={loadingDependencies || loading}
+              disabled={isFormDisabled}
             />
           </div>
         </div>
@@ -255,14 +321,14 @@ export default function ActivityCreate({ onCreated, onCancel }: ActivityCreatePr
         <div className="flex gap-8">
           <div className="flex items-center gap-2">
             <input type="checkbox" id="comConsulta" name="comConsulta" checked={formData.comConsulta} onChange={handleChange}
-              disabled={loadingDependencies || loading}
+              disabled={isFormDisabled}
               className="h-4 w-4 text-green-500 border-gray-300 rounded focus:ring-green-500"
             />
             <label htmlFor="comConsulta" className="text-sm font-medium text-gray-700">Com Consulta?</label>
           </div>
           <div className="flex items-center gap-2">
             <input type="checkbox" id="liberdadeCriativa" name="liberdadeCriativa" checked={formData.liberdadeCriativa} onChange={handleChange}
-              disabled={loadingDependencies || loading}
+              disabled={isFormDisabled}
               className="h-4 w-4 text-green-500 border-gray-300 rounded focus:ring-green-500"
             />
             <label htmlFor="liberdadeCriativa" className="text-sm font-medium text-gray-700">Liberdade Criativa?</label>
@@ -274,7 +340,7 @@ export default function ActivityCreate({ onCreated, onCancel }: ActivityCreatePr
           <label htmlFor="descricaoAdicional" className="block text-sm font-medium text-gray-700 mb-1">Descrição Adicional</label>
           <textarea id="descricaoAdicional" name="descricaoAdicional" value={formData.descricaoAdicional} onChange={handleChange} rows={3}
             className="w-full px-3 py-2 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-green-400 focus:outline-none"
-            disabled={loadingDependencies || loading}
+            disabled={isFormDisabled}
           />
         </div>
 
@@ -282,14 +348,14 @@ export default function ActivityCreate({ onCreated, onCancel }: ActivityCreatePr
           <button
             type="button"
             onClick={onCancel}
-            disabled={loading || loadingDependencies}
+            disabled={isFormDisabled}
             className="flex-1 bg-gray-300 text-gray-700 font-semibold py-2 px-4 rounded-xl shadow hover:bg-gray-400 transition-colors"
           >
             Cancelar
           </button>
           <button
             type="submit"
-            disabled={loading || loadingDependencies}
+            disabled={isFormDisabled}
             className="flex-1 bg-green-500 text-white font-semibold py-2 px-4 rounded-xl shadow hover:bg-green-600 transition-colors disabled:opacity-50"
           >
             {loading ? 'Salvando...' : 'Salvar Atividade'}

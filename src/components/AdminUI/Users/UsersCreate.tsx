@@ -1,342 +1,285 @@
 'use client'
 
-import { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
+import { FaPlus, FaTrashAlt } from "react-icons/fa";
 
-// Define os tipos esperados pelo UsersManager (para feedback e navegação)
-interface UsersCreateProps {
-  onCreated: () => void;
-  onCancel: () => void;
+// Interface para o tipo 'Escola'
+interface Escola {
+    id: string;
+    nome: string;
 }
 
-// O tipo do formulário é uma parte da interface Docente
-interface FormData {
-  codigo: string;
-  nome: string;
-  email: string;
-  // cpf: string;
-  senha: string;
-  // materia: string;
-  // turmas: string[];
-  nivelAcesso: string;
-}
-
+// Define a interface para o tipo 'Acesso' que vamos buscar da API
 interface Acesso {
-  id: string;
-  nome: string;
+    id: string;
+    nome: string;
+}
+
+// Define os tipos para o formulário
+interface FormData {
+    registro: string; // Campo obrigatório
+    nome: string;
+    email: string;
+    cpf: string; // Mantido, mas não mais exibido no JSX
+    senha: string;
+    materia: string; // Mantido, mas não mais exibido no JSX
+    turmas: string[]; // Mantido, mas não mais exibido no JSX
+    nivelAcesso: string;
+    escolaId: string;
+}
+
+// Define os tipos esperados pelo UsersManager
+interface UsersCreateProps {
+    onCreated: () => void;
+    onCancel: () => void;
 }
 
 export default function UsersCreate({ onCreated, onCancel }: UsersCreateProps) {
-  const { API_BASE_URL, token } = useAuth();
-  const router = useRouter();
-  const [acessos, setAcessos] = useState<Acesso[]>([]);
-  const [acessoId, setAcessoId] = useState('');
-  const [loadingAcessos, setLoadingAcessos] = useState(true);
+    const { API_BASE_URL, token, user } = useAuth();
+    const router = useRouter();
 
-  useEffect(() => {
-    const fetchAcessos = async () => {
-        setLoadingAcessos(true);
+    const [formData, setFormData] = useState<FormData>({
+        registro: "",
+        nome: "",
+        email: "",
+        cpf: "",
+        senha: "",
+        materia: "",
+        turmas: [],
+        nivelAcesso: "Professor", // Valor padrão
+        escolaId: user?.escolaId || "", // Preenche com a escola do usuário logado
+    });
+
+    const [acessos, setAcessos] = useState<Acesso[]>([]);
+    const [escolas, setEscolas] = useState<Escola[]>([]);
+    const [loading, setLoading] = useState(false);
+    const [loadingResources, setLoadingResources] = useState(true);
+    const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+    const isAdmin = user?.acesso === 'Administrador';
+    const isEscolaDisabled = !isAdmin || loadingResources || loading;
+
+    // UseEffect para buscar acessos e escolas
+    useEffect(() => {
+        const fetchResources = async () => {
+            if (!token) return;
+            setLoadingResources(true);
+            try {
+                // NOTA: A rota /api/acessos deve estar montada no index.ts
+                const [escolasRes, acessosRes] = await Promise.all([
+                    fetch(`${API_BASE_URL}/api/escolas`, { headers: { Authorization: `Bearer ${token}` } }),
+                    fetch(`${API_BASE_URL}/api/acessos`, { headers: { Authorization: `Bearer ${token}` } }),
+                ]);
+
+                if (escolasRes.ok) {
+                    const escolasData: Escola[] = await escolasRes.json();
+                    setEscolas(escolasData);
+                    // Lógica para definir a escola padrão/selecionada
+                    if (user?.escolaId) {
+                         setFormData(prev => ({ ...prev, escolaId: user.escolaId }));
+                    } else if (isAdmin && escolasData.length > 0) {
+                        setFormData(prev => ({ ...prev, escolaId: escolasData[0].id }));
+                    }
+                }
+                if (acessosRes.ok) {
+                    const acessosData: Acesso[] = await acessosRes.json();
+                    setAcessos(acessosData);
+                    // Garante que o nível de acesso padrão seja um valor válido da lista
+                    const defaultAcesso = acessosData.find(a => a.nome === "Professor") || acessosData[0];
+                    setFormData(prev => ({ ...prev, nivelAcesso: defaultAcesso.nome }));
+                }
+            } catch (error) {
+                // Se a API falhar (ex: 403 Forbidden), o formulário não será bloqueado.
+                // O erro de login expirado deve ser resolvido no login.
+                console.error("Erro ao carregar recursos:", error);
+                setMessage({ type: 'error', text: 'Não foi possível carregar os recursos do formulário.' });
+            } finally {
+                setLoadingResources(false);
+            }
+        };
+        fetchResources();
+    }, [API_BASE_URL, token, user?.acesso, user?.escolaId]);
+
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+        const { name, value } = e.target;
+        setFormData((prev) => ({ ...prev, [name]: value }));
+        setMessage(null);
+    };
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
         if (!token) {
-          setLoadingAcessos(false);
-          return;
+            setMessage({ type: 'error', text: 'Sessão expirada. Faça login novamente.' });
+            router.push('/');
+            return;
         }
 
-        const url = `${API_BASE_URL}/api/docentes/acessos`;
+        setLoading(true);
+        setMessage(null);
 
         try {
-            const response = await fetch(url, {
-                headers: {
-                    Authorization: `Bearer ${token}`
-                }
+            const payload = {
+                ...formData,
+                escolaId: isAdmin ? formData.escolaId : user?.escolaId, // Garante que apenas Admin pode mudar
+            };
+
+            const response = await fetch(`${API_BASE_URL}/api/docentes`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify(payload),
             });
+
             if (!response.ok) {
-                throw new Error('Falha ao buscar níveis de acesso');
+                const errorData = await response.json();
+                throw new Error(errorData.error || `Erro de servidor ao criar docente: ${response.status}`);
             }
-            const data: Acesso[] = await response.json();
-            setAcessos(data);
-            if (data.length > 0) {
-                setFormData(prev => ({ ...prev, nivelAcesso: data[0].id }));
-            }
-        } catch (error) {
-            console.error('Erro ao buscar níveis de acesso:', error);
-            setMessage({ type: 'error', text: 'Não foi possível carregar os níveis de acesso.' });
+
+            setMessage({ type: 'success', text: 'Docente cadastrado com sucesso!' });
+            
+            setFormData({
+                registro: "", nome: "", email: "", cpf: "", senha: "", materia: "", turmas: [],
+                nivelAcesso: "Professor", escolaId: user?.escolaId || ""
+            });
+            
+            setTimeout(onCreated, 1500);
+
+        } catch (err) {
+            const errorText = err instanceof Error ? err.message : 'Erro desconhecido ao cadastrar.';
+            setMessage({ type: 'error', text: errorText });
         } finally {
-            setLoadingAcessos(false);
+            setLoading(false);
         }
     };
-    fetchAcessos();
-}, [API_BASE_URL, token]);
-  
-  const [formData, setFormData] = useState<FormData>({
-    codigo: "",
-    nome: "",
-    email: "",
-    // cpf: "",
-    senha: "",
-    // materia: "",
-    // turmas: [],
-    nivelAcesso: "",
-  });
-  const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  // Placeholder para simular turmas
-  const turmasPlaceholder = ["Turma A", "Turma B", "Turma C", "Turma D"];
+    const messageClass = message 
+        ? message.type === 'success' 
+            ? 'bg-green-100 border-green-400 text-green-700' 
+            : 'bg-red-100 border-red-400 text-red-700' 
+        : '';
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-    setMessage(null);
-  };
+    return (
+        <div className="w-full max-w-lg mx-auto p-4 md:p-8 bg-gray-50 min-h-screen">
+            <div className="bg-white rounded-2xl shadow-xl p-6 md:p-8">
+                <h2 className="text-2xl font-bold text-green-600 mb-6 text-center">Cadastrar Novo Docente</h2>
+                
+                {message && (
+                    <div className={`p-3 mb-4 rounded-lg text-center font-medium ${messageClass}`}>
+                        {message.text}
+                    </div>
+                )}
 
-  const handleSelectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const { name, selectedOptions } = e.target;
-    const selectedValues = Array.from(selectedOptions, (option) => option.value);
-    setFormData((prev) => ({ ...prev, [name]: selectedValues }));
-    setMessage(null);
-  };
+                <form onSubmit={handleSubmit} className="space-y-4">
+                    
+                    {/* Campo Registro / Matrícula */}
+                    <div>
+                        <label htmlFor="registro" className="block text-sm font-medium text-gray-700 mb-1">
+                            Registro / Matrícula
+                        </label>
+                        <input
+                            type="text" id="registro" name="registro" value={formData.registro} onChange={handleChange} required
+                            disabled={loading}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-green-400 focus:outline-none"
+                        />
+                    </div>
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!token) {
-      setMessage({ type: 'error', text: 'Sessão expirada. Faça login novamente.' });
-      router.push('/');
-      return;
-    }
-    
-    setLoading(true);
-    setMessage(null);
+                    {/* Escola */}
+                    <div>
+                        <label htmlFor="escolaId" className="block text-sm font-medium text-gray-700 mb-1">
+                            Escola
+                        </label>
+                        <select
+                            id="escolaId"
+                            name="escolaId"
+                            value={formData.escolaId}
+                            onChange={handleChange}
+                            required
+                            disabled={isEscolaDisabled}
+                            className={`w-full px-3 py-2 border rounded-xl shadow-sm focus:ring-2 focus:ring-green-400 focus:outline-none 
+                                ${isEscolaDisabled ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'}`}
+                        >
+                            <option value="">
+                                {loadingResources ? 'A carregar...' : '-- Selecione a Escola --'}
+                            </option>
+                            {escolas.map((escola) => (
+                                <option key={escola.id} value={escola.id}>
+                                    {escola.nome}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
 
-    const payload = {
-      registro: formData.codigo,
-      nome: formData.nome,
-      email: formData.email,
-      // cpf: formData.cpf,
-      senha: formData.senha,
-      // materia: formData.materia,
-      // turmas: formData.turmas, 
-      acessoId: formData.nivelAcesso, // Defina um valor de nível de acesso padrão para novos docentes
-    };
-    
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/docentes`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify(payload),
-      });
+                    <div>
+                        <label htmlFor="nivelAcesso" className="block text-sm font-medium text-gray-700 mb-1">
+                            Nível de Acesso
+                        </label>
+                        <select
+                            id="nivelAcesso"
+                            name="nivelAcesso"
+                            value={formData.nivelAcesso}
+                            onChange={handleChange}
+                            required
+                            disabled={loadingResources || loading}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-green-400 focus:outline-none"
+                        >
+                            {acessos.map((acesso) => (
+                                <option key={acesso.id} value={acesso.nome}>
+                                    {acesso.nome}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || `Erro de servidor: ${response.status}`);
-      }
+                    {/* Nome */}
+                    <div>
+                        <label htmlFor="nome" className="block text-sm font-medium text-gray-700 mb-1">
+                            Nome do Docente
+                        </label>
+                        <input
+                            type="text" id="nome" name="nome" value={formData.nome} onChange={handleChange} required
+                            disabled={loading}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-green-400 focus:outline-none"
+                        />
+                    </div>
+                    
+                    {/* Email */}
+                    <div>
+                        <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+                            Email
+                        </label>
+                        <input
+                            type="email" id="email" name="email" value={formData.email} onChange={handleChange} required
+                            disabled={loading}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-green-400 focus:outline-none"
+                        />
+                    </div>
+                    
+                    {/* Senha */}
+                    <div>
+                        <label htmlFor="senha" className="block text-sm font-medium text-gray-700 mb-1">
+                            Senha
+                        </label>
+                        <input
+                            type="password" id="senha" name="senha" value={formData.senha} onChange={handleChange} required
+                            disabled={loading}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-green-400 focus:outline-none"
+                        />
+                    </div>
 
-      setMessage({ type: 'success', text: 'Docente cadastrado com sucesso!' });
-      
-      setFormData({
-        codigo: "", nome: "", email: "",  senha: "", nivelAcesso: acessos[0]?.id || ""
-      });
-      
-      setTimeout(onCreated, 1500); 
-
-    } catch (err) {
-      const errorText = err instanceof Error ? err.message : 'Erro desconhecido ao cadastrar.';
-      setMessage({ type: 'error', text: errorText });
-    } finally {
-      setLoading(false);
-    }
-  };
-  
-  const messageClass = message 
-    ? message.type === 'success' 
-      ? 'bg-green-100 border-green-400 text-green-700'
-      : 'bg-red-100 border-red-400 text-red-700'
-    : '';
-
-  return (
-    <div className="w-full max-w-lg mx-auto bg-white rounded-2xl shadow-xl p-8 mt-4">
-      <h2 className="text-2xl font-bold text-green-500 mb-6 text-center">Cadastrar Novo Docente</h2>
-      
-      {message && (
-        <div className={`p-3 mb-4 rounded-lg text-center font-medium ${messageClass}`}>
-          {message.text}
+                    {/* Botões */}
+                    <div className="mt-8 flex justify-end gap-4">
+                        <button type="button" onClick={onCancel} disabled={loading}
+                            className="w-full md:w-auto bg-gray-300 text-gray-700 font-semibold py-2 px-6 rounded-xl shadow-md hover:bg-gray-400 transition-colors">
+                            Cancelar
+                        </button>
+                        <button type="submit" disabled={loading}
+                            className="w-full md:w-auto bg-green-600 text-white font-semibold py-2 px-6 rounded-xl shadow-md hover:bg-green-700 transition-colors disabled:opacity-50">
+                            {loading ? 'Salvando...' : 'Salvar Docente'}
+                        </button>
+                    </div>
+                </form>
+            </div>
         </div>
-      )}
-
-      <form onSubmit={handleSubmit} className="space-y-4">
-        {/* Código de Funcionário */}
-        <div>
-          <label htmlFor="codigo" className="block text-sm font-medium text-gray-700 mb-1">
-            Código de Funcionário (Registro)
-          </label>
-          <input
-            type="text"
-            id="codigo"
-            name="codigo"
-            value={formData.codigo}
-            onChange={handleChange}
-            required
-            disabled={loading}
-            className="w-full px-3 py-2 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-green-400 focus:outline-none"
-          />
-        </div>
-
-        {/* Nome */}
-        <div>
-          <label htmlFor="nome" className="block text-sm font-medium text-gray-700 mb-1">
-            Nome do Docente
-          </label>
-          <input
-            type="text"
-            id="nome"
-            name="nome"
-            value={formData.nome}
-            onChange={handleChange}
-            required
-            disabled={loading}
-            className="w-full px-3 py-2 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-green-400 focus:outline-none"
-          />
-        </div>
-
-        {/* Email */}
-        <div>
-          <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
-            Email
-          </label>
-          <input
-            type="email"
-            id="email"
-            name="email"
-            value={formData.email}
-            onChange={handleChange}
-            required
-            disabled={loading}
-            className="w-full px-3 py-2 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-green-400 focus:outline-none"
-          />
-        </div>
-
-        {/* CPF 
-        <div>
-          <label htmlFor="cpf" className="block text-sm font-medium text-gray-700 mb-1">
-            CPF
-          </label>
-          <input
-            type="text"
-            id="cpf"
-            name="cpf"
-            value={formData.cpf}
-            onChange={handleChange}
-            required
-            disabled={loading}
-            className="w-full px-3 py-2 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-green-400 focus:outline-none"
-          />
-        </div>*/}
-
-        {/* Senha */}
-        <div>
-          <label htmlFor="senha" className="block text-sm font-medium text-gray-700 mb-1">
-            Senha (Será criptografada no servidor)
-          </label>
-          <input
-            type="password"
-            id="senha"
-            name="senha"
-            value={formData.senha}
-            onChange={handleChange}
-            required
-            disabled={loading}
-            className="w-full px-3 py-2 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-green-400 focus:outline-none"
-          />
-        </div>
-
-        {/* Matéria 
-        <div>
-          <label htmlFor="materia" className="block text-sm font-medium text-gray-700 mb-1">
-            Matéria
-          </label>
-          <input
-            type="text"
-            id="materia"
-            name="materia"
-            value={formData.materia}
-            onChange={handleChange}
-            required
-            disabled={loading}
-            className="w-full px-3 py-2 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-green-400 focus:outline-none"
-          />
-        </div>*/}
-
-        {/* Turmas atribuídas 
-        <div>
-          <label htmlFor="turmas" className="block text-sm font-medium text-gray-700 mb-1">
-            Turmas atribuídas
-          </label>
-          <select
-            multiple
-            id="turmas"
-            value={formData.turmas}
-            onChange={handleSelectChange}
-            disabled={loading}
-            className="w-full px-3 py-2 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-green-400 focus:outline-none h-32"
-          >
-            {turmasPlaceholder.map((turma) => (
-              <option key={turma} value={turma}>
-                {turma}
-              </option>
-            ))}
-          </select>
-          <p className="text-xs text-gray-500 mt-1">
-            Segure <kbd>Ctrl</kbd> (ou <kbd>Cmd</kbd> no Mac) para selecionar mais de uma.
-          </p>
-        </div>*/}
-
-        {/* Nível de Acesso */}
-        <div>
-          <label htmlFor="nivelAcesso" className="block text-sm font-medium text-gray-700 mb-1">
-            Nível de Acesso
-          </label>
-          <select
-            id="nivelAcesso"
-            name="nivelAcesso"
-            value={formData.nivelAcesso}
-            onChange={handleChange}
-            className="w-full px-3 py-2 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-green-400 focus:outline-none"
-            required
-            disabled={loadingAcessos || loading}
-          >
-            <option value="" disabled>
-              {loadingAcessos ? 'A carregar...' : 'Selecione um nível de acesso'}
-            </option>
-            {acessos.map((acesso) => (
-              <option key={acesso.id} value={acesso.id}>
-                {acesso.nome}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {/* Botões */}
-        <div className="flex justify-between gap-4 pt-2">
-          <button
-            type="button"
-            onClick={onCancel}
-            disabled={loading}
-            className="flex-1 bg-gray-300 text-gray-700 font-semibold py-2 px-4 rounded-xl shadow hover:bg-gray-400 transition-colors"
-          >
-            Cancelar
-          </button>
-          <button
-            type="submit"
-            disabled={loading}
-            className="flex-1 bg-green-500 text-white font-semibold py-2 px-4 rounded-xl shadow hover:bg-green-600 transition-colors disabled:opacity-50"
-          >
-            {loading ? 'Salvando...' : 'Salvar Docente'}
-          </button>
-        </div>
-      </form>
-    </div>
-  );
+    );
 }

@@ -6,115 +6,148 @@ import InsightDetail from './InsightDetail';
 
 // Tipos base para o Manager
 interface CondicaoAluno {
-  id: string;
-  nomeCondicao: string;
-  statusComprovacao: string;
-  descricaoAdicional: string;
+  id: string;
+  nomeCondicao: string;
+  statusComprovacao: string;
+  descricaoAdicional: string;
 }
 
 interface Aluno {
-  id: string;
-  Nome: string;
-  Matricula: string;
-  turmaId: string;
-  condicao: CondicaoAluno[];
+  id: string;
+  Nome: string;
+  Matricula: string;
+  turmaId: string;
+  condicao: CondicaoAluno[];
 }
 
 interface Turma {
-  id: string;
-  Nome: string;
+  id: string;
+  Nome: string;
 }
 
 interface Insight {
-  id: string;
-  dataGeracao: string;
-  textoInsight: string;
-  jsonInput: any;
+  id: string;
+  dataGeracao: string;
+  textoInsight: string;
+  jsonInput: any;
 }
 
 type ViewState = 'LIST' | 'GENERATE' | 'DETAIL';
 
 export default function InsightManager() {
-  const { API_BASE_URL, token } = useAuth();
-  const [turmas, setTurmas] = useState<Turma[]>([]);
-  const [alunos, setAlunos] = useState<Aluno[]>([]);
-  const [insights, setInsights] = useState<Insight[]>([]);
-  const [selectedTurmaId, setSelectedTurmaId] = useState('');
-  const [selectedAlunoId, setSelectedAlunoId] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [view, setView] = useState<ViewState>('LIST');
-  const [selectedInsight, setSelectedInsight] = useState<Insight | null>(null);
+  // CORRIGIDO: Incluindo viewingSchoolId e user do AuthContext
+  const { API_BASE_URL, token, user, viewingSchoolId } = useAuth();
+  const [turmas, setTurmas] = useState<Turma[]>([]);
+  const [alunos, setAlunos] = useState<Aluno[]>([]);
+  const [insights, setInsights] = useState<Insight[]>([]);
+  const [selectedTurmaId, setSelectedTurmaId] = useState('');
+  const [selectedAlunoId, setSelectedAlunoId] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [view, setView] = useState<ViewState>('LIST');
+  const [selectedInsight, setSelectedInsight] = useState<Insight | null>(null);
 
-  const fetchDependencies = useCallback(async () => {
-    if (!token) return;
-    setLoading(true);
-    try {
-      const [turmasRes, alunosRes] = await Promise.all([
-        fetch(`${API_BASE_URL}/api/turmas`, { headers: { Authorization: `Bearer ${token}` } }),
-        fetch(`${API_BASE_URL}/api/alunos`, { headers: { Authorization: `Bearer ${token}` } }),
-      ]);
-      if (turmasRes.ok) setTurmas(await turmasRes.json());
-      if (alunosRes.ok) setAlunos(await alunosRes.json());
-    } catch (err) {
-      console.error('Erro ao buscar dados:', err);
-      setError('Falha ao carregar dados iniciais.');
-    } finally {
-      setLoading(false);
-    }
-  }, [API_BASE_URL, token]);
+  const isAdmin = user?.acesso === 'Administrador';
 
-  const fetchInsights = useCallback(async () => {
-    if (!token || !selectedAlunoId) {
-        setInsights([]);
+  const fetchDependencies = useCallback(async () => {
+    if (!token) return;
+    
+    // 1. Determina o ID de filtro
+    const escolaIdParaFiltrar = isAdmin ? viewingSchoolId : user?.escolaId;
+
+    // Bloqueia a busca se não houver ID válido (Admin sem seleção)
+    if (!escolaIdParaFiltrar) {
+        setTurmas([]);
+        setAlunos([]);
+        setLoading(false);
         return;
     }
-    try {
-      const insightsRes = await fetch(`${API_BASE_URL}/api/insights/aluno/${selectedAlunoId}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (insightsRes.ok) {
-        const data = await insightsRes.json();
-        setInsights(data);
-      }
-    } catch (err) {
-      console.error('Erro ao buscar insights:', err);
-      setError('Falha ao carregar insights do aluno.');
+    
+    setLoading(true);
+    setError(null);
+    
+    // Monta a URL de filtro para Turmas e Alunos
+    const urlQuery = `?viewingSchoolId=${escolaIdParaFiltrar}`;
+    
+    try {
+      const [turmasRes, alunosRes] = await Promise.all([
+        // CORRIGIDO: Adicionando filtro de escola
+        fetch(`${API_BASE_URL}/api/turmas${urlQuery}`, { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(`${API_BASE_URL}/api/alunos${urlQuery}`, { headers: { Authorization: `Bearer ${token}` } }),
+      ]);
+      if (turmasRes.ok) setTurmas(await turmasRes.json());
+      if (alunosRes.ok) setAlunos(await alunosRes.json());
+    } catch (err) {
+      console.error('Erro ao buscar dados:', err);
+      setError('Falha ao carregar dados iniciais.');
+    } finally {
+      setLoading(false);
+    }
+  }, [API_BASE_URL, token, user?.escolaId, isAdmin, viewingSchoolId]); // Dependências atualizadas
+
+  const fetchInsights = useCallback(async () => {
+    if (!token || !selectedAlunoId) {
+        setInsights([]);
+        return;
+    }
+    try {
+      const insightsRes = await fetch(`${API_BASE_URL}/api/insights/aluno/${selectedAlunoId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (insightsRes.ok) {
+        const data = await insightsRes.json();
+        setInsights(data);
+      }
+    } catch (err) {
+      console.error('Erro ao buscar insights:', err);
+      setError('Falha ao carregar insights do aluno.');
+    }
+  }, [API_BASE_URL, token, selectedAlunoId]);
+
+  useEffect(() => {
+    fetchDependencies();
+  }, [fetchDependencies]);
+
+  useEffect(() => {
+    if (selectedAlunoId) {
+      fetchInsights();
+    }
+  }, [selectedAlunoId, fetchInsights]);
+
+  const alunosDaTurma = selectedTurmaId
+    ? alunos.filter((aluno) => aluno.turmaId === selectedTurmaId)
+    : [];
+
+  const handleTurmaChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setSelectedTurmaId(e.target.value);
+    setSelectedAlunoId('');
+    setInsights([]);
+  };
+
+  const handleAlunoChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setSelectedAlunoId(e.target.value);
+  };
+  
+  const handleSavedInsight = () => {
+    setView('LIST'); // 1. Volta para a visualização de lista
+    fetchInsights(); // 2. Recarrega os insights para incluir o novo
+  };
+
+  const renderView = () => {
+    if (loading) return <p className="text-center mt-8">A carregar...</p>;
+    if (error) return <p className="text-center text-red-500 mt-8">Erro: {error}</p>;
+
+    // Adicionado bloqueio visual para Admin sem escola selecionada
+    if (isAdmin && !viewingSchoolId) {
+         return (
+            <div className="text-center p-12 bg-yellow-100 rounded-xl mt-8">
+                <p className="text-xl font-semibold text-yellow-800">
+                    Por favor, selecione uma escola no cabeçalho superior para gerar insights.
+                </p>
+            </div>
+        );
     }
-  }, [API_BASE_URL, token, selectedAlunoId]);
 
-  useEffect(() => {
-    fetchDependencies();
-  }, [fetchDependencies]);
-
-  useEffect(() => {
-    if (selectedAlunoId) {
-      fetchInsights();
-    }
-  }, [selectedAlunoId, fetchInsights]);
-
-  const alunosDaTurma = selectedTurmaId
-    ? alunos.filter((aluno) => aluno.turmaId === selectedTurmaId)
-    : [];
-
-  const handleTurmaChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setSelectedTurmaId(e.target.value);
-    setSelectedAlunoId('');
-    setInsights([]);
-  };
-
-  const handleAlunoChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setSelectedAlunoId(e.target.value);
-  };
-  
-  const handleSavedInsight = () => {
-    setView('LIST'); // 1. Volta para a visualização de lista
-    fetchInsights(); // 2. Recarrega os insights para incluir o novo
-  };
-
-  const renderView = () => {
-    if (loading) return <p className="text-center mt-8">A carregar...</p>;
-    if (error) return <p className="text-center text-red-500 mt-8">Erro: {error}</p>;
 
     switch (view) {
       case 'GENERATE':

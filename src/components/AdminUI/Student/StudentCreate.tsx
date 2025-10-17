@@ -10,7 +10,7 @@ import { Fragment } from "react";
 interface Turma {
   id: string;
   Nome: string;
-}
+}   
 
 // Define os tipos para o novo formulário de condições
 interface ConditionFormData {
@@ -35,7 +35,7 @@ interface StudentCreateProps {
 }
 
 export default function StudentCreate({ onCreated, onCancel }: StudentCreateProps) {
-    const { API_BASE_URL, token } = useAuth();
+    const { API_BASE_URL, token, user, viewingSchoolId } = useAuth(); 
     const router = useRouter();
 
     const [formData, setFormData] = useState<FormData>({
@@ -54,25 +54,42 @@ export default function StudentCreate({ onCreated, onCancel }: StudentCreateProp
 
     // UseEffect para buscar as turmas da API
     useEffect(() => {
-        const fetchTurmas = async () => {
-            if (!token) return;
-            setLoadingTurmas(true);
-            try {
-                const response = await fetch(`${API_BASE_URL}/api/turmas`, {
-                    headers: { Authorization: `Bearer ${token}` }
-                });
-                if (!response.ok) throw new Error('Falha ao buscar turmas');
-                const data: Turma[] = await response.json();
-                setTurmas(data);
-                if (data.length > 0) setFormData(prev => ({ ...prev, turmaId: data[0].id }));
-            } catch (error) {
-                setMessage({ type: 'error', text: 'Não foi possível carregar as turmas.' });
-            } finally {
+        const fetchTurmas = async () => {
+            if (!token) return;
+            setLoadingTurmas(true);
+
+            // 1. Determina o ID de filtro: Admin usa viewingSchoolId, outros usam user.escolaId
+            const escolaIdParaFiltrar = user?.acesso === 'Administrador' ? viewingSchoolId : user?.escolaId;
+
+            // Bloqueia a busca se não houver ID válido (Admin sem seleção)
+            if (!escolaIdParaFiltrar) {
+                setTurmas([]);
                 setLoadingTurmas(false);
+                return;
             }
-        };
-        fetchTurmas();
-    }, [API_BASE_URL, token, router]);
+
+            // 2. Monta a URL com o parâmetro de consulta para o backend filtrar
+            const url = `${API_BASE_URL}/api/turmas?viewingSchoolId=${escolaIdParaFiltrar}`;
+
+            try {
+                const response = await fetch(url, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                if (!response.ok) throw new Error('Falha ao buscar turmas');
+                const data: Turma[] = await response.json();
+                setTurmas(data);
+                // Se houver turmas, define a primeira como padrão
+                if (data.length > 0) setFormData(prev => ({ ...prev, turmaId: data[0].id }));
+                else setFormData(prev => ({ ...prev, turmaId: "" })); // Limpa turmaId se não houver turmas
+            } catch (error) {
+                setMessage({ type: 'error', text: 'Não foi possível carregar as turmas.' });
+            } finally {
+                setLoadingTurmas(false);
+            }
+        };
+        // Dependências atualizadas para reexecutar o fetch quando o filtro global mudar
+        fetchTurmas();
+    }, [API_BASE_URL, token, router, user?.escolaId, user?.acesso, viewingSchoolId]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
         const { name, value } = e.target;
@@ -122,12 +139,24 @@ export default function StudentCreate({ onCreated, onCancel }: StudentCreateProp
         setMessage(null);
 
         let alunoId = "";
+        
+        // 1. Determina o ID de escola a ser salvo (Admin usa viewingSchoolId, outros usam user.escolaId)
+        const escolaIdToSave = user?.acesso === 'Administrador' ? viewingSchoolId : user?.escolaId;
+
+        // 2. Validação dos campos obrigatórios do formulário E ID de escola
+        if (!formData.Nome || !formData.Matricula || !formData.turmaId || !escolaIdToSave) {
+             setMessage({ type: 'error', text: 'Nome, Matrícula, Turma e ID da escola são obrigatórios.' });
+             setLoading(false);
+             return;
+        }
+
         try {
             const alunoPayload = {
                 Nome: formData.Nome,
                 Matricula: formData.Matricula,
                 Idade: formData.Idade,
                 turmaId: formData.turmaId,
+                escolaId: escolaIdToSave,
             };
 
             const alunoResponse = await fetch(`${API_BASE_URL}/api/alunos`, {

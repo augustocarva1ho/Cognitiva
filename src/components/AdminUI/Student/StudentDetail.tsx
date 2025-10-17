@@ -13,10 +13,13 @@ interface Aluno {
   Nome: string;
   Matricula: string;
   Idade: number;
+  escolaId: string; // Adicionado para a lógica de segurança
+  turmaId: string; // Adicionado para a lógica de formulário
   turma: {
     Nome: string;
     id: string;
   };
+  condicao?: Condition[]; 
 }
 
 // Interface para o tipo de dado 'Turma'
@@ -27,10 +30,10 @@ interface Turma {
 
 // Interfaces para a lógica de Condições
 interface Condition {
-    id?: string; // ID da CondicaoAluno, é opcional para novas condições
-    nomeCondicao: string;
-    statusComprovacao: string;
-    descricaoAdicional: string;
+    id?: string; // ID da CondicaoAluno, é opcional para novas condições
+    nomeCondicao: string;
+    statusComprovacao: string;
+    descricaoAdicional: string;
 }
 
 interface StudentDetailProps {
@@ -48,51 +51,60 @@ interface StudentFormData {
 
 
 export default function StudentDetail({ aluno, onDone, onCancel }: StudentDetailProps) {
-  const { API_BASE_URL, token } = useAuth();
+  const { API_BASE_URL, token, user, viewingSchoolId } = useAuth();
+  const router = useRouter();
+
   const [formData, setFormData] = useState<StudentFormData>({
     Nome: aluno.Nome,
     Matricula: aluno.Matricula,
     Idade: aluno.Idade,
     turmaId: aluno.turma.id,
   });
-  const [conditionsData, setConditionsData] = useState<Condition[]>([]);
+  const [conditionsData, setConditionsData] = useState<Condition[]>(aluno.condicao || []); 
   const [turmas, setTurmas] = useState<Turma[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingTurmas, setLoadingTurmas] = useState(true);
-  const [loadingCondicoes, setLoadingCondicoes] = useState(true);
+  const [loadingCondicoes, setLoadingCondicoes] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  // UseEffect para buscar as turmas e condições
-  useEffect(() => {
-    const fetchDependencies = async () => {
-      if (!token) {
-        setMessage({ type: 'error', text: 'Sessão expirada.' });
-        return;
-      }
-      // Busca turmas
-      setLoadingTurmas(true);
-      try {
-        const turmasRes = await fetch(`${API_BASE_URL}/api/turmas`, { headers: { Authorization: `Bearer ${token}` } });
-        if (turmasRes.ok) setTurmas(await turmasRes.json());
-      } catch (error) {
-        setMessage({ type: 'error', text: 'Não foi possível carregar as turmas.' });
-      } finally {
-        setLoadingTurmas(false);
+  const isAdmin = user?.acesso === 'Administrador';
+  
+  // O ID da escola que está a ser operada (viewingSchoolId se Admin, escolaId do Docente caso contrário)
+  const escolaDeOperacao = isAdmin ? viewingSchoolId : user?.escolaId;
+
+  // Permissão de edição/exclusão: Apenas Admin OU Supervisor/Professor se for na própria escola
+  const canOperate = isAdmin || (user?.escolaId === aluno.escolaId);
+
+  // UseEffect para buscar as turmas (filtradas)
+  useEffect(() => {
+    const fetchDependencies = async () => {
+      if (!token) return;
+
+      // 1. Busca turmas (filtradas pela escola de visualização/pertencimento)
+      setLoadingTurmas(true);
+      const escolaIdParaFiltrar = escolaDeOperacao;
+
+      if (!escolaIdParaFiltrar) {
+          setMessage({ type: 'error', text: 'ID da escola de operação ausente.' });
+          setLoadingTurmas(false);
+          return;
       }
 
-      // Busca condições do aluno
-      setLoadingCondicoes(true);
-      try {
-        const condicoesRes = await fetch(`${API_BASE_URL}/api/condicoes/aluno/${aluno.id}`, { headers: { Authorization: `Bearer ${token}` } });
-        if (condicoesRes.ok) setConditionsData(await condicoesRes.json());
-      } catch (error) {
-        setMessage({ type: 'error', text: 'Não foi possível carregar as condições do aluno.' });
-      } finally {
-        setLoadingCondicoes(false);
-      }
-    };
-    fetchDependencies();
-  }, [API_BASE_URL, token, aluno.id]);
+      try {
+        const turmasRes = await fetch(`${API_BASE_URL}/api/turmas?viewingSchoolId=${escolaIdParaFiltrar}`, { headers: { Authorization: `Bearer ${token}` } });
+        if (turmasRes.ok) setTurmas(await turmasRes.json());
+      } catch (error) {
+        setMessage({ type: 'error', text: 'Não foi possível carregar as turmas.' });
+      } finally {
+        setLoadingTurmas(false);
+      }
+      
+      // NOTA: A busca de condições foi removida daqui. A nova API deve incluir as condições no payload do Aluno
+      // O componente StudentManager deve ser ajustado para chamar o GET /api/alunos/id que retorna tudo.
+
+    };
+    fetchDependencies();
+  }, [API_BASE_URL, token, escolaDeOperacao]);
 
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -102,120 +114,147 @@ export default function StudentDetail({ aluno, onDone, onCancel }: StudentDetail
   };
 
   const handleConditionChange = (index: number, e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    const updatedConditions = [...conditionsData];
-    updatedConditions[index] = { ...updatedConditions[index], [name]: value };
-    setConditionsData(updatedConditions);
-  };
+    const { name, value } = e.target;
+    const updatedConditions = [...conditionsData];
+    updatedConditions[index] = { ...updatedConditions[index], [name]: value };
+    setConditionsData(updatedConditions);
+  };
 
-  const handleAddCondition = () => {
-    setConditionsData(prev => [...prev, { nomeCondicao: "", statusComprovacao: "Suspeita Médica", descricaoAdicional: "" }]);
-  };
+  const handleAddCondition = () => {
+    // Adiciona uma nova condição vazia (sem ID)
+    setConditionsData(prev => [...prev, { nomeCondicao: "", statusComprovacao: "Suspeita Médica", descricaoAdicional: "" }]);
+  };
 
-  const handleRemoveCondition = async (index: number) => {
-    const conditionToRemove = conditionsData[index];
-    if (conditionToRemove.id) { // Se a condição já existe, envia para a API para remover
-      if (!window.confirm(`Tem certeza que deseja remover esta condição?`)) {
-        return;
-      }
-      try {
-        const res = await fetch(`${API_BASE_URL}/api/condicoes/${conditionToRemove.id}`, {
-          method: 'DELETE',
-          headers: { 'Authorization': `Bearer ${token}` },
-        });
-        if (!res.ok) throw new Error('Falha ao remover a condição da API.');
-        setMessage({ type: 'success', text: 'Condição removida com sucesso!' });
-      } catch (err) {
-        setMessage({ type: 'error', text: (err as Error).message });
-        return;
-      }
+  const handleRemoveCondition = async (index: number) => {
+    const conditionToRemove = conditionsData[index];
+    if (!canOperate) {
+      setMessage({ type: 'error', text: 'Permissão negada.' });
+      return;
     }
-    const updatedConditions = conditionsData.filter((_, i) => i !== index);
-    setConditionsData(updatedConditions);
-  };
+
+    if (conditionToRemove.id) { // Se a condição já existe (tem ID), envia para a API para remover
+      if (!window.confirm(`Tem certeza que deseja remover esta condição?`)) {
+        return;
+      }
+      setLoading(true);
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/condicoes/${conditionToRemove.id}`, {
+          method: 'DELETE',
+          headers: { 'Authorization': `Bearer ${token}` },
+        });
+        if (!res.ok) throw new Error('Falha ao remover a condição da API.');
+        setMessage({ type: 'success', text: 'Condição removida com sucesso!' });
+        
+        // Se a exclusão da API foi bem-sucedida, atualiza o estado local
+        const updatedConditions = conditionsData.filter((_, i) => i !== index);
+        setConditionsData(updatedConditions);
+        
+      } catch (err) {
+        setMessage({ type: 'error', text: (err as Error).message });
+      } finally {
+        setLoading(false);
+      }
+    } else {
+        // Remove apenas do estado local se a condição for nova (não tem ID)
+        const updatedConditions = conditionsData.filter((_, i) => i !== index);
+        setConditionsData(updatedConditions);
+    }
+  };
   
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!token) {
-      setMessage({ type: 'error', text: 'Sessão expirada.' });
-      return;
-    }
-    setLoading(true);
-    setMessage(null);
+    e.preventDefault();
+    if (!token || !canOperate) {
+      setMessage({ type: 'error', text: 'Permissão negada ou sessão expirada.' });
+      return;
+    }
+    setLoading(true);
+    setMessage(null);
 
-    try {
-      // 1. Envia a atualização do aluno
-      const alunoResponse = await fetch(`${API_BASE_URL}/api/alunos/${aluno.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify(formData),
-      });
-      if (!alunoResponse.ok) {
-        const errorData = await alunoResponse.json();
-        throw new Error(errorData.error || `Falha ao atualizar aluno: ${alunoResponse.statusText}`);
-      }
+    // ID da escola para o PUT (Admin usa o ID de visualização; Docente usa o ID do aluno)
+    const escolaIdToUpdate = aluno.escolaId; 
+    
+    // Parametro de query com o ID de visualização (necessário para a permissão do backend)
+    const queryParam = escolaDeOperacao ? `?viewingSchoolId=${escolaDeOperacao}` : '';
 
-      // 2. Processa as condições novas (sem ID)
-      const novasCondicoes = conditionsData.filter(c => !c.id);
-      for (const cond of novasCondicoes) {
-        const condicaoPayload = {
-          alunoId: aluno.id,
-          nomeCondicao: cond.nomeCondicao,
-          statusComprovacao: cond.statusComprovacao,
-          descricaoAdicional: cond.descricaoAdicional
-        };
-        const condicaoRes = await fetch(`${API_BASE_URL}/api/condicoes/atribuir`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-          body: JSON.stringify(condicaoPayload),
-        });
-        if (!condicaoRes.ok) {
-          console.error("Erro ao adicionar nova condição:", await condicaoRes.json());
-        }
-      }
+    try {
+      // 1. Envia a atualização do aluno
+      const alunoResponse = await fetch(`${API_BASE_URL}/api/alunos/${aluno.id}${queryParam}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({
+            ...formData,
+            escolaId: escolaIdToUpdate, // Necessário para a validação da API
+        }),
+      });
+      if (!alunoResponse.ok) {
+        const errorData = await alunoResponse.json();
+        throw new Error(errorData.error || `Falha ao atualizar aluno: ${alunoResponse.statusText}`);
+      }
 
-      setMessage({ type: 'success', text: 'Aluno e condições atualizados com sucesso!' });
-      setTimeout(onDone, 1500); 
-    } catch (err) {
-      const errorText = err instanceof Error ? err.message : 'Erro desconhecido ao atualizar.';
-      setMessage({ type: 'error', text: errorText });
-    } finally {
-      setLoading(false);
-    }
-  };
+      // 2. Processa as condições novas (sem ID)
+      const novasCondicoes = conditionsData.filter(c => !c.id);
+      for (const cond of novasCondicoes) {
+        const condicaoPayload = {
+          alunoId: aluno.id,
+          nomeCondicao: cond.nomeCondicao,
+          statusComprovacao: cond.statusComprovacao,
+          descricaoAdicional: cond.descricaoAdicional
+        };
+        const condicaoRes = await fetch(`${API_BASE_URL}/api/condicoes/atribuir`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+          body: JSON.stringify(condicaoPayload),
+        });
+        if (!condicaoRes.ok) {
+          console.error("Erro ao adicionar nova condição:", await condicaoRes.json());
+        }
+      }
+
+      setMessage({ type: 'success', text: 'Aluno e condições atualizados com sucesso!' });
+      setTimeout(onDone, 1500); 
+    } catch (err) {
+      const errorText = err instanceof Error ? err.message : 'Erro desconhecido ao atualizar.';
+      setMessage({ type: 'error', text: errorText });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleDelete = async () => {
-    if (!window.confirm(`Tem certeza que deseja excluir o aluno ${aluno.Nome}? Esta ação é irreversível.`)) {
-      return;
-    }
-    if (!token) {
-      setMessage({ type: 'error', text: 'Sessão expirada.' });
-      return;
-    }
+    if (!window.confirm(`Tem certeza que deseja excluir o aluno ${aluno.Nome}? Esta ação é irreversível.`)) {
+      return;
+    }
+    if (!token || !canOperate) {
+      setMessage({ type: 'error', text: 'Permissão negada ou sessão expirada.' });
+      return;
+    }
 
-    setLoading(true);
-    setMessage(null);
+    setLoading(true);
+    setMessage(null);
     
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/alunos/${aluno.id}`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` },
-      });
+    // Parametro de query com o ID de visualização (necessário para a permissão do backend)
+    const queryParam = escolaDeOperacao ? `?viewingSchoolId=${escolaDeOperacao}` : '';
+    
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/alunos/${aluno.id}${queryParam}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || `Falha ao excluir aluno: ${response.statusText}`);
-      }
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `Falha ao excluir aluno: ${response.statusText}`);
+      }
 
-      setMessage({ type: 'success', text: 'Aluno excluído com sucesso!' });
-      setTimeout(onDone, 1500); 
-    } catch (err) {
-      const errorText = err instanceof Error ? err.message : 'Erro desconhecido ao excluir.';
-      setMessage({ type: 'error', text: errorText });
-    } finally {
-      setLoading(false);
-    }
-  };
+      setMessage({ type: 'success', text: 'Aluno excluído com sucesso!' });
+      setTimeout(onDone, 1500); 
+    } catch (err) {
+      const errorText = err instanceof Error ? err.message : 'Erro desconhecido ao excluir.';
+      setMessage({ type: 'error', text: errorText });
+    } finally {
+      setLoading(false);
+    }
+  };
   
   const messageClass = message 
     ? message.type === 'success' 
