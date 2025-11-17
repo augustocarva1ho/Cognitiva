@@ -3,14 +3,13 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 
-// A API retorna o objeto Aluno completo, então a interface deve refletir isso
 interface AlunoComDadosCompletos {
   id: string;
   Nome: string;
   Matricula: string;
   Idade: number | null;
   turma: { Nome: string; id: string; };
-  condicao: { // CORRIGIDO: A interface reflete o nome da sua model (singular)
+  condicao: { 
     id: string;
     nomeCondicao: string;
     statusComprovacao: string;
@@ -31,7 +30,7 @@ interface InsightGenerateProps {
 export default function InsightGenerate({ alunoId, onSaved, onCancel }: InsightGenerateProps) {
   const { API_BASE_URL, token, user } = useAuth();
   const router = useRouter();
-  // O estado agora armazena o objeto Aluno completo diretamente
+  // O state armazena o objeto Aluno completo diretamente
   const [alunoData, setAlunoData] = useState<AlunoComDadosCompletos | null>(null);
   const [prompt, setPrompt] = useState('Analise o histórico de desempenho e condições do aluno. Forneça um resumo dos pontos fortes e fracos e três sugestões específicas para o professor adaptar as atividades e o ambiente de aprendizagem.');
   
@@ -53,7 +52,7 @@ export default function InsightGenerate({ alunoId, onSaved, onCancel }: InsightG
       if (!response.ok) throw new Error('Falha ao buscar dados do aluno para insight.');
       
       const data: AlunoComDadosCompletos = await response.json();
-      // CORRIGIDO: O estado é definido diretamente com a resposta da API
+      // state definido diretamente com a resposta da API
       setAlunoData(data);
     } catch (err) {
       setError('Falha ao carregar dados do aluno.');
@@ -100,12 +99,10 @@ export default function InsightGenerate({ alunoId, onSaved, onCancel }: InsightG
 
   if (loadingData) return <p className="text-center mt-8">A carregar dados do aluno...</p>;
   if (error) return <p className="text-center text-red-500 mt-8">Erro: {error}</p>;
-  // Agora a verificação é sobre o estado geral, não uma propriedade
   if (!alunoData) return <p className="text-center text-gray-500 mt-8">Aluno não encontrado.</p>;
 
-  // Função utilitária para formatar o JSON (o JSON que a API USARIA)
+  // Função utilitária para formatar o JSON 
   const formatJson = () => {
-    // A API envia os dados completos, então formatamos a partir do estado
     const fullJson = {
         aluno: {
             Nome: alunoData.Nome,

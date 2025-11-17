@@ -30,7 +30,7 @@ const allMenuItems = [
     { title: 'Área da Turma', component: <ClassUI />, roles: ['Professor', 'Supervisor', 'Administrador'] },
     { title: 'Gerar Insight', component: <InsightManager />, roles: ['Professor', 'Supervisor', 'Administrador'] },
     { title: 'Gerir Atividades', component: <ActivitiesManager />, roles: ['Professor', 'Supervisor', 'Administrador'] },
-    { title: 'Comunicação', component: <div>💬 Painel de Comunicação</div>, roles: ['Professor', 'Supervisor', 'Administrador'] },
+    //{ title: 'Comunicação', component: <div>💬 Painel de Comunicação</div>, roles: ['Professor', 'Supervisor', 'Administrador'] },
     { title: 'Gerenciar Alunos', component: <StudentManager />, roles: ['Professor', 'Supervisor', 'Administrador'] },
     
     // Supervisor (Nível 2)

@@ -33,7 +33,7 @@ export default function ClassManager() {
             return;
         }
         
-        // Se for Admin e o ID de visualização for nulo, paramos a busca (exibe a mensagem)
+        // Se for Admin e o ID de visualização for nulo, a busca para
         if (userRole === 'Administrador' && !escolaIdParaFiltrar) {
             setTurmas([]);
             setLoading(false);
@@ -104,7 +104,7 @@ export default function ClassManager() {
         setView('LIST');
         // Recarrega forçando a execução da busca com os parâmetros atuais
         const escolaIdParaFiltrar = user?.acesso === 'Administrador' ? viewingSchoolId : user?.escolaId;
-        // CORRIGIDO: Usa o operador '!' para garantir a tipagem na chamada de retorno
+        
         fetchTurmas(token, user!.acesso, escolaIdParaFiltrar || null); 
         setSelectedTurma(null);
     };
@@ -156,9 +156,9 @@ export default function ClassManager() {
                             />
                             <button
                                 onClick={() => setView('CREATE')}
-                                className="bg-green-500 text-white font-semibold py-2 px-4 rounded-xl shadow-md hover:bg-green-600 transition-colors flex items-center"
+                                className="bg-green-400 text-white font-semibold py-2 px-4 rounded-xl whitespace-nowrap shadow-md hover:bg-green-600 transition-colors flex items-center"
                             >
-                                + Cadastrar Nova Turma
+                                Nova Turma
                             </button>
                         </div>
 

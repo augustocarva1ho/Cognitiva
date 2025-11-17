@@ -123,7 +123,7 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
             type="text"
             value={registro}
             onChange={(e) => setRegistro(e.target.value)}
-            placeholder="Registro / E-mail" // Corrigido para refletir o nome do campo
+            placeholder="Registro" // Corrigido para refletir o nome do campo
             required
             className="p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-300 text-gray-500"
             disabled={loading}

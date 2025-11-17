@@ -21,7 +21,7 @@ export default function Home() {
     }
   };
   return (    
-    <div className="pt-20 items-center justify-items-center min-h-screen pb-20 gap-16 font-[family-name:var(--font-geist-sans)]">
+    <div className="pt-20 items-center justify-items-center min-h-screen gap-16 font-[family-name:var(--font-geist-sans)]">
       <Top/>
       <div id="home" className="flex gap-[32px] row-start-2 items-center sm:items-start mt-16">
           <div>

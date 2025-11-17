@@ -140,9 +140,9 @@ export default function SubjectManager() {
                             {canCreateOrEdit && (
                                 <button
                                     onClick={() => setView('CREATE')}
-                                    className="bg-green-500 text-white font-semibold py-2 px-4 rounded-xl shadow-md hover:bg-green-600 transition-colors flex items-center"
+                                    className="bg-green-400 text-white font-semibold py-2 px-4 rounded-xl shadow-md whitespace-nowrap  hover:bg-green-600 transition-colors flex items-center"
                                 >
-                                    + Cadastrar Nova Matéria
+                                    Nova Matéria
                                 </button>
                             )}
                         </div>

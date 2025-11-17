@@ -113,12 +113,12 @@ export default function SchoolManager() {
     return (
         <div className="w-full max-w-4xl mx-auto p-6 bg-white rounded-2xl shadow-xl mt-4">
             <div className="flex justify-between items-center mb-6">
-                <h1 className="text-3xl font-bold text-green-600">Gestão de Escolas</h1>
+                <h1 className="text-3xl font-bold text-gray-600">Gestão de Escolas</h1>
                 <button
                     onClick={() => setView('CREATE')}
-                    className="bg-green-500 text-white font-semibold py-2 px-6 rounded-xl shadow-md hover:bg-green-600 transition-colors"
+                    className="bg-green-400 text-white font-semibold py-2 px-6 rounded-xl shadow-md hover:bg-green-600 transition-colors"
                 >
-                    + Cadastrar Nova
+                    Nova Escola
                 </button>
             </div>
             

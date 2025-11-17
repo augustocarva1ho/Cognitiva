@@ -34,9 +34,9 @@ export default function Top() {
   const professorAreaPath = "/user_interface";
 
   return (
-    <div className="fixed top-0 left-0 w-screen bg-green-300 h-20 text-zinc-50 font-bold flex items-center justify-between px-8">
+    <div className="fixed top-0 left-0 w-screen bg-green-300 h-20 text-zinc-50 font-bold flex items-center justify-between px-4">
 
-      <div className="text-lg flex gap-4 items-center px-8 py-4">
+      <div className="text-lg flex gap-4 items-center ml-4 px-8 py-4">
         <Link href="/" onClick={handleClick} className="flex items-center">
           <img src="./head-logo2.svg" className="w-12 ml-[-32px]" alt="Logo" />
           COGNITIVA
@@ -46,7 +46,7 @@ export default function Top() {
       {/* Links de Navegação */}
       <nav className="flex gap-20 text-md">
         <Link href={pathname === "/" ? "#sobre-nos" : "/#sobre-nos"} scroll={true} className="hover:underline">Sobre nós</Link>
-        <Link href={pathname === "/" ? "#noticias" : "/#noticias"} scroll={true} className="hover:underline">Notícias</Link>
+        <Link href={pathname === "/" ? "#noticias" : "/#noticias"} scroll={true} className="hover:underline">Benefícios</Link>
         <Link href={pathname === "/" ? "#contato" : "/#contato"} scroll={true} className="hover:underline">Contato</Link>
         
         {/* O link para a área do professor, agora condicionalmente estilizado */}
@@ -62,9 +62,9 @@ export default function Top() {
       <div className="flex items-center gap-4">
         {isLoggedIn ? (
           // Se LOGADO, mostra nome e botão de SAIR
-          <div className="flex items-center gap-4">
-            <span className="text-sm font-medium whitespace-nowrap">
-              Olá, **{user?.nome.split(' ')[0] || 'Docente'}**
+          <div className="flex items-center gap-4 right-0">
+            <span className="text-sm flex gap-1 font-medium whitespace-nowrap">
+              Olá, <p className="font-bold"> {user?.nome.split(' ')[0] || 'Docente'}</p>
             </span>
 
             <button 
@@ -72,9 +72,8 @@ export default function Top() {
               className="bg-red-500 text-zinc-50 px-4 py-1 rounded hover:bg-red-600 transition font-medium"
               title="Sair"
             >
-              🚪 Sair
-            </button>
-            <div className="w-8 h-8 bg-gray-400 rounded-full"></div> {/* Imagem placeholder */}
+              Sair
+            </button>            
           </div>
         ) : (
           // Se DESLOGADO, mostra o botão de LOGIN (Estilo Original Restaurado)
@@ -85,6 +84,7 @@ export default function Top() {
             Login
           </button>
         )}
+        <img src="./header-pixel-art.png" className="h-20"/>
       </div>
       
       <LoginModal isOpen={showLogin} onClose={() => setShowLogin(false)} />
