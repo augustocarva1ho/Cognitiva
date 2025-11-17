@@ -32,7 +32,7 @@ export default function InsightGenerate({ alunoId, onSaved, onCancel }: InsightG
   const router = useRouter();
   // O state armazena o objeto Aluno completo diretamente
   const [alunoData, setAlunoData] = useState<AlunoComDadosCompletos | null>(null);
-  const [prompt, setPrompt] = useState('Analise o histórico de desempenho e condições do aluno. Forneça um resumo dos pontos fortes e fracos e três sugestões específicas para o professor adaptar as atividades e o ambiente de aprendizagem.');
+  //const [prompt, setPrompt] = useState('Analise o histórico de desempenho e condições do aluno. Forneça um resumo dos pontos fortes e fracos e três sugestões específicas para o professor adaptar as atividades e o ambiente de aprendizagem.');
   
   const [loadingData, setLoadingData] = useState(true);
   const [generating, setGenerating] = useState(false);
@@ -150,7 +150,7 @@ export default function InsightGenerate({ alunoId, onSaved, onCancel }: InsightG
 
       {/* Seção de Prompt e Geração */}
       <div className="space-y-4">
-        <div>
+        {/* <div>
           <label htmlFor="prompt" className="block text-lg font-medium text-gray-700 mb-1">Instrução Personalizada para a IA</label>
           <textarea
             id="prompt"
@@ -160,7 +160,7 @@ export default function InsightGenerate({ alunoId, onSaved, onCancel }: InsightG
             className="w-full p-3 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-purple-400 focus:outline-none"
             disabled={generating}
           />
-        </div>
+        </div> */}
 
         <div className="flex gap-4">
           <button
@@ -189,7 +189,7 @@ export default function InsightGenerate({ alunoId, onSaved, onCancel }: InsightG
       {insightText && (
         <div className="mt-8">
           <h3 className="text-xl font-semibold text-gray-800 mb-4">Análise Concluída</h3>
-          <div className="bg-blue-50 p-6 rounded-xl border border-blue-200">
+          <div className="bg-blue-50 p-6 rounded-xl border border-green-200">
             <p className="text-gray-800 whitespace-pre-wrap">{insightText}</p>
           </div>
           <button

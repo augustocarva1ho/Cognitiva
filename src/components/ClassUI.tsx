@@ -34,7 +34,7 @@ interface Avaliacao {
   id: string;
   notaNumerica: number;
   avaliacaoEscrita: string | null;
-  entregouNoPrazo: string | null; 
+  observacaoPrazo: string | null; 
   atividadeId: string;
   alunoId: string;
   atividade: Atividade;
@@ -67,7 +67,7 @@ export default function ClassUI() {
     atividadeId: '',
     notaNumerica: '' as number | '',
     avaliacaoEscrita: '',
-    entregouNoPrazo: '',
+    observacaoPrazo: '',
     error: '',
     loading: false,
   });
@@ -239,7 +239,7 @@ export default function ClassUI() {
         atividadeId: avaliacaoExistente.atividadeId,
         notaNumerica: avaliacaoExistente.notaNumerica,
         avaliacaoEscrita: avaliacaoExistente.avaliacaoEscrita || '',
-        entregouNoPrazo: avaliacaoExistente.entregouNoPrazo || '',
+        observacaoPrazo: avaliacaoExistente.observacaoPrazo || '',
         error: '',
         loading: false,
       }));
@@ -250,7 +250,7 @@ export default function ClassUI() {
         atividadeId: atividadeId,
         notaNumerica: '' as number | '',
         avaliacaoEscrita: '',
-        entregouNoPrazo: '', 
+        observacaoPrazo: '', 
         error: '',
         loading: false,
       }));
@@ -266,7 +266,7 @@ export default function ClassUI() {
         atividadeId: novaAvaliacao.atividadeId,
         notaNumerica: Number(novaAvaliacao.notaNumerica),
         avaliacaoEscrita: novaAvaliacao.avaliacaoEscrita,
-        entregouNoPrazo: novaAvaliacao.entregouNoPrazo, 
+        observacaoPrazo: novaAvaliacao.observacaoPrazo, 
         professorId: user?.id,
     };
 
@@ -280,7 +280,7 @@ export default function ClassUI() {
       if (!response.ok) throw new Error("Erro ao atribuir avaliação.");
       
       alert("Avaliação atribuída/atualizada com sucesso!");
-      setNovaAvaliacao(prev => ({ ...prev, atividadeId: '', notaNumerica: '', avaliacaoEscrita: '', entregouNoPrazo: '' }));
+      setNovaAvaliacao(prev => ({ ...prev, atividadeId: '', notaNumerica: '', avaliacaoEscrita: '', observacaoPrazo: '' }));
       fetchAlunoData(selectedAluno.id);
     } catch (err) {
       alert("Falha ao salvar avaliação: " + (err as Error).message);
@@ -314,10 +314,10 @@ export default function ClassUI() {
   if (error) { return <p className="text-center p-8 text-red-500">Erro: {error}</p>; }
 
   return (
-    <div className="min-h-screen">
+    <div className="w-full max-w-screen mx-auto p-6 bg-white rounded-2xl shadow-xl mt-4">
       {/* CABEÇALHO FIXO: Seleção de Turma e Aluno */}
-      <div className="sticky top-0 z-10 bg-white p-4 mb-6 border-b shadow-md">
-        <div className="flex gap-4 items-center px-6"> 
+      <div className="top-0 z-10 bg-white p-4 mb-6 border-b shadow-sm">
+        <div className="flex gap-4 items-center px-6 "> 
           
           {/* Seleção de Turma */}
           <div>
@@ -337,7 +337,7 @@ export default function ClassUI() {
           </div>
 
           {/* Seleção de Aluno */}
-          {selectedTurmaId && (
+          { (
             <div>
               <label className="block mb-1 text-sm font-bold">Aluno:</label>
               <select
@@ -358,7 +358,7 @@ export default function ClassUI() {
 
           {/* Exibição do Nome do Aluno Selecionado (Simplesmente para fixar a informação) */}
           {selectedAluno && (
-              <h2 className="ml-auto text-xl font-extrabold text-green-700">
+              <h2 className="ml-auto text-xl font-extrabold text-green-400">
                   {selectedAluno.Nome}
               </h2>
           )}
@@ -520,12 +520,12 @@ export default function ClassUI() {
                 
                 {/* Campo "Observações sobre o Prazo/Entrega" */}
                 <div className="flex flex-col gap-1 mb-4">
-                  <label htmlFor="entregouNoPrazo" className="text-sm font-medium">Observações sobre o Prazo/Entrega:</label>
+                  <label htmlFor="observacaoPrazo" className="text-sm font-medium">Observações sobre o Prazo/Entrega:</label>
                   <textarea 
-                    id="entregouNoPrazo"
+                    id="observacaoPrazo"
                     placeholder="Ex: Entregue com 1 dia de atraso. Baseado neste campo, o sistema deduz se foi entregue no prazo."
-                    value={novaAvaliacao.entregouNoPrazo}
-                    onChange={(e) => setNovaAvaliacao(prev => ({ ...prev, entregouNoPrazo: e.target.value }))}
+                    value={novaAvaliacao.observacaoPrazo}
+                    onChange={(e) => setNovaAvaliacao(prev => ({ ...prev, observacaoPrazo: e.target.value }))}
                     disabled={loadingAlunoData}
                     className="w-full px-3 py-2 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-green-400 focus:outline-none"
                     rows={1}

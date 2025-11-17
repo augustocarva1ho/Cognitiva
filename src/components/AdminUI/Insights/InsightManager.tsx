@@ -36,9 +36,9 @@ type ViewState = 'LIST' | 'GENERATE' | 'DETAIL';
 
 export default function InsightManager() {
   // CORRIGIDO: Incluindo viewingSchoolId e user do AuthContext
-  const { API_BASE_URL, token, user, viewingSchoolId } = useAuth();
-  const [turmas, setTurmas] = useState<Turma[]>([]);
-  const [alunos, setAlunos] = useState<Aluno[]>([]);
+  const { API_BASE_URL, token, user, viewingSchoolId } = useAuth();
+  const [turmas, setTurmas] = useState<Turma[]>([]);
+  const [alunos, setAlunos] = useState<Aluno[]>([]);
   const [insights, setInsights] = useState<Insight[]>([]);
   const [selectedTurmaId, setSelectedTurmaId] = useState('');
   const [selectedAlunoId, setSelectedAlunoId] = useState('');
@@ -193,7 +193,7 @@ export default function InsightManager() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 p-8">
+    <div className="w-full max-w-4xl mx-auto p-6 bg-white rounded-2xl mt-4">
       <div className="w-full max-w-4xl mx-auto">
         <h1 className="text-3xl font-extrabold text-gray-800 mb-8">Gerar Insight da Turma</h1>
         <div className="flex gap-4 mb-8">
@@ -212,7 +212,7 @@ export default function InsightManager() {
               ))}
             </select>
           </div>
-          {selectedTurmaId && (
+          {(
             <div>
               <label className="block mb-2 font-bold">Selecione o Aluno:</label>
               <select
