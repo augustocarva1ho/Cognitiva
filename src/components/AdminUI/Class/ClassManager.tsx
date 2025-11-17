@@ -1,4 +1,5 @@
 'use client';
+
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import ClassCreate from './ClassCreate';
@@ -15,8 +16,8 @@ interface Turma {
 type ViewState = 'LIST' | 'CREATE' | 'DETAIL';
 
 export default function ClassManager() {
-    // Adicionado viewingSchoolId e API_BASE_URL do AuthContext
     const { API_BASE_URL, token, user, viewingSchoolId } = useAuth(); 
+
     const [turmas, setTurmas] = useState<Turma[]>([]);
     const [view, setView] = useState<ViewState>('LIST');
     const [searchTerm, setSearchTerm] = useState('');
@@ -24,16 +25,13 @@ export default function ClassManager() {
     const [error, setError] = useState<string | null>(null);
     const [selectedTurma, setSelectedTurma] = useState<Turma | null>(null);
 
-    // Função para carregar as turmas da API
-    // Agora aceita token e escolaId como argumentos de execução
     const fetchTurmas = useCallback(async (token: string | null, userRole: string, escolaIdParaFiltrar: string | null) => {
         if (!token) {
             setError('Sessão expirada. Por favor, faça login novamente.');
             setLoading(false);
             return;
         }
-        
-        // Se for Admin e o ID de visualização for nulo, a busca para
+
         if (userRole === 'Administrador' && !escolaIdParaFiltrar) {
             setTurmas([]);
             setLoading(false);
@@ -42,21 +40,21 @@ export default function ClassManager() {
 
         setLoading(true);
         setError(null);
+
         try {
-            // Monta a URL para enviar o ID correto como query parameter
             const queryParam = escolaIdParaFiltrar ? `?viewingSchoolId=${escolaIdParaFiltrar}` : '';
             const url = `${API_BASE_URL}/api/turmas${queryParam}`;
 
             const response = await fetch(url, {
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`, // Envia o token para autenticação
+                    'Authorization': `Bearer ${token}`,
                 },
             });
 
             if (!response.ok) {
                 const errorData = await response.json();
-                throw new Error(errorData.error || `Falha ao carregar a lista de turmas. Status: ${response.status}`);
+                throw new Error(errorData.error || `Falha ao carregar turmas.`);
             }
 
             const data: Turma[] = await response.json();
@@ -66,46 +64,39 @@ export default function ClassManager() {
         } finally {
             setLoading(false);
         }
-    }, [API_BASE_URL, token, user?.acesso]); // Dependências do useCallback simplificadas
+    }, [API_BASE_URL]);
 
-    // Este useEffect agora trata a mudança de ID e chama a função de busca
+    // Carrega turmas ao iniciar ou mudar escola
     useEffect(() => {
-        // 1. Determina qual ID usar para o filtro 
-        const escolaIdParaFiltrar = user?.acesso === 'Administrador' ? viewingSchoolId : user?.escolaId;
-        
-        // 2. Garante que o valor é string ou null (não undefined)
+        const escolaIdParaFiltrar =
+            user?.acesso === 'Administrador' ? viewingSchoolId : user?.escolaId;
+
         const finalId = escolaIdParaFiltrar || null;
-        
-        // CORRIGIDO: Se for Admin, só executa a busca se finalId não for nulo.
+
         if (token) {
             if (user?.acesso === 'Administrador' && finalId) {
-                 fetchTurmas(token, user.acesso, finalId);
+                fetchTurmas(token, user.acesso, finalId);
             } else if (user?.acesso !== 'Administrador') {
-                 // CORRIGIDO: Usa o operador '!' para garantir a tipagem (pois sabemos que o token é válido aqui)
-                 fetchTurmas(token, user!.acesso, user!.escolaId);
+                fetchTurmas(token, user!.acesso, user!.escolaId);
             } else if (user?.acesso === 'Administrador' && !finalId) {
-                 // Admin sem ID, apenas define o estado para mostrar a mensagem sem loop infinito
-                 setTurmas([]);
-                 setLoading(false);
+                setTurmas([]);
+                setLoading(false);
             }
         } else {
-             setLoading(false);
+            setLoading(false);
         }
+    }, [fetchTurmas, viewingSchoolId, user?.escolaId, user?.acesso, token]);
 
-    }, [fetchTurmas, viewingSchoolId, user?.escolaId, user?.acesso, token]); // Dependências corrigidas
-
-    // Filtra a lista com base no termo de pesquisa
-    const filteredTurmas = turmas.filter(turma =>
-        turma.Nome.toLowerCase().includes(searchTerm.toLowerCase())
+    const filteredTurmas = turmas.filter(t =>
+        t.Nome.toLowerCase().includes(searchTerm.toLowerCase())
     );
-    
-    // Função para voltar à lista e recarregar os dados
+
     const handleReturnToList = () => {
         setView('LIST');
-        // Recarrega forçando a execução da busca com os parâmetros atuais
-        const escolaIdParaFiltrar = user?.acesso === 'Administrador' ? viewingSchoolId : user?.escolaId;
-        
-        fetchTurmas(token, user!.acesso, escolaIdParaFiltrar || null); 
+        const escolaIdParaFiltrar =
+            user?.acesso === 'Administrador' ? viewingSchoolId : user?.escolaId;
+
+        fetchTurmas(token, user!.acesso, escolaIdParaFiltrar || null);
         setSelectedTurma(null);
     };
 
@@ -114,96 +105,120 @@ export default function ClassManager() {
         setView('DETAIL');
     };
 
-    const renderView = () => {
-        if (loading) {
-            return <p className="text-center text-gray-500 mt-8">A carregar turmas...</p>;
-        }
-        if (error) {
-            return <p className="text-center text-red-500 mt-8">Erro: {error}</p>;
-        }
+    // -----------------------
+    // RENDERIZAÇÃO CONDICIONAL NO MODELO PADRÃO
+    // -----------------------
 
-        // Se for Admin e não selecionou uma escola, mostra mensagem
-        if (user?.acesso === 'Administrador' && !viewingSchoolId) {
-            return (
-                <div className="text-center p-12 bg-yellow-100 rounded-xl mt-8">
-                    <p className="text-xl font-semibold text-yellow-800">
-                        Por favor, selecione uma escola acima para gerenciar as turmas.
-                    </p>
-                </div>
-            );
-        }
+    if (loading) {
+        return <div className="text-center p-8 text-gray-500">Carregando turmas...</div>;
+    }
 
-        switch (view) {
-            case 'CREATE':
-                return <ClassCreate onCreated={handleReturnToList} onCancel={() => setView('LIST')} />;
+    if (error) {
+        return <div className="text-center p-8 text-red-500">Erro: {error}</div>;
+    }
 
-            case 'DETAIL':
-                return selectedTurma ? (
-                    <ClassDetail turma={selectedTurma} onDone={handleReturnToList} onCancel={() => setView('LIST')} />
-                ) : <p className="text-center text-red-500 mt-8">Turma não selecionada.</p>;
+    if (user?.acesso === 'Administrador' && !viewingSchoolId) {
+        return (
+            <div className="text-center p-12 text-yellow-700 bg-yellow-100 rounded-xl mt-4">
+                Selecione uma escola para visualizar as turmas.
+            </div>
+        );
+    }
 
-            case 'LIST':
-            default:
-                return (
-                    <>
-                        <div className="flex justify-between items-center mb-6">
-                            <input
-                                type="text"
-                                placeholder="Pesquisar por nome da turma..."
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                className="w-2/3 px-4 py-2 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-green-300 focus:outline-none"
-                            />
-                            <button
-                                onClick={() => setView('CREATE')}
-                                className="bg-green-400 text-white font-semibold py-2 px-4 rounded-xl whitespace-nowrap shadow-md hover:bg-green-600 transition-colors flex items-center"
-                            >
-                                Nova Turma
-                            </button>
-                        </div>
+    // CREATE
+    if (view === 'CREATE') {
+        return <ClassCreate onCreated={handleReturnToList} onCancel={handleReturnToList} />;
+    }
 
-                        <div className="bg-white rounded-xl shadow-lg overflow-hidden">
-                            {filteredTurmas.length === 0 ? (
-                                <p className="p-6 text-center text-gray-500">Nenhuma turma cadastrada na escola atual.</p>
-                            ) : (
-                                <ul className="divide-y divide-gray-200">
-                                    {filteredTurmas.map((turma) => (
-                                        <li
-                                            key={turma.id}
-                                            onClick={() => handleTurmaClick(turma)}
-                                            className="p-4 flex justify-between items-center hover:bg-green-50 cursor-pointer transition-colors"
-                                        >
-                                            <div>
-                                                <p className="text-lg font-medium text-gray-800">{turma.Nome}</p>
-                                                <p className="text-sm text-gray-500">
-                                                    Alunos: {turma.Alunos.length}
-                                                </p>
-                                            </div>
-                                            <span className="text-green-500 text-sm font-semibold">Detalhes &gt;</span>
-                                        </li>
-                                    ))}
-                                </ul>
-                            )}
-                        </div>
-                    </>
-                );
-        }
-    };
+    // DETAIL
+    if (view === 'DETAIL') {
+        return selectedTurma ? (
+            <ClassDetail turma={selectedTurma} onDone={handleReturnToList} onCancel={() => setView('LIST')} />
+        ) : (
+            <div className="text-center p-8 text-gray-500">Nenhuma turma selecionada.</div>
+        );
+    }
+
+    // -----------------------
+    // LIST — modelo de referência
+    // -----------------------
 
     return (
-        <div className="min-h-screen bg-gray-100 p-8">
-            <div className="w-full max-w-4xl mx-auto">
-                <h1 className="text-3xl font-extrabold text-gray-800 mb-8">Gerenciar Turmas</h1>
-                {view !== 'LIST' && (
-                    <button 
-                        onClick={() => handleReturnToList()} 
-                        className="mb-4 text-green-500 hover:underline flex items-center"
-                    >
-                        &lt; Voltar para a Lista
-                    </button>
-                )}
-                {renderView()}
+        <div className="w-full max-w-4xl mx-auto p-6 bg-white rounded-2xl shadow-xl mt-4">
+            <div className="flex justify-between items-center mb-6">
+                <h1 className="text-3xl font-bold text-gray-600">Gestão de Turmas</h1>
+
+                <button
+                    onClick={() => setView('CREATE')}
+                    className="bg-green-400 text-white font-semibold py-2 px-6 rounded-xl shadow-md hover:bg-green-600 transition-colors"
+                >
+                    Nova Turma
+                </button>
             </div>
+
+            {/* Barra de pesquisa */}
+            <div className="mb-6">
+                <input
+                    type="text"
+                    placeholder="Pesquisar por nome da turma..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-green-300 focus:outline-none"
+                />
+            </div>
+
+            {/* Lista */}
+            {filteredTurmas.length === 0 ? (
+                <div className="text-center py-12 text-gray-500 text-lg">
+                    {searchTerm
+                        ? `Nenhuma turma encontrada para "${searchTerm}".`
+                        : "Nenhuma turma cadastrada ainda."}
+                </div>
+            ) : (
+                <div className="overflow-hidden overflow-y-auto max-h-96 shadow-lg border border-gray-200 rounded-xl">
+                    <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                            <tr>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Turma
+                                </th>
+
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Alunos
+                                </th>
+
+                                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Ações
+                                </th>
+                            </tr>
+                        </thead>
+
+                        <tbody className="bg-white divide-y divide-gray-200">
+                            {filteredTurmas.map((turma) => (
+                                <tr
+                                    key={turma.id}
+                                    onClick={() => handleTurmaClick(turma)}
+                                    className="cursor-pointer hover:bg-gray-50"
+                                >
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                        {turma.Nome}
+                                    </td>
+
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                        {turma.Alunos.length} alunos
+                                    </td>
+
+                                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                        <span className="text-green-500 hover:text-green-700">
+                                            Ver Detalhes
+                                        </span>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            )}
         </div>
     );
 }

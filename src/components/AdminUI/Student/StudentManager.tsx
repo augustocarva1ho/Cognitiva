@@ -1,209 +1,239 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import StudentCreate from './StudentCreate'; 
+import StudentCreate from './StudentCreate';
 import StudentDetail from './StudentDetail';
 
-// --- INTERFACES DE DADOS SINCRONIZADAS ---
+// Interfaces
 interface CondicaoAluno {
-    id: string;
-    nomeCondicao: string;
-    statusComprovacao: string;
-    descricaoAdicional: string;
+  id: string;
+  nomeCondicao: string;
+  statusComprovacao: string;
+  descricaoAdicional: string;
 }
 
-// Define a interface completa para o tipo 'Aluno' (que a API /api/alunos retorna)
 interface Aluno {
-    id: string;
+  id: string;
+  Nome: string;
+  Matricula: string;
+  Idade: number;
+  turmaId: string;
+  escolaId: string;
+  turma: {
     Nome: string;
-    Matricula: string;
-    Idade: number;
-    turmaId: string; // Adicionado para filtro
-    escolaId: string; // Adicionado a FK de escola
-    turma: {
-        Nome: string;
-        id: string;
-    };
-    // Tornamos condicoes opcional para evitar crash durante a listagem inicial
-    condicoes?: CondicaoAluno[]; 
+    id: string;
+  };
+  condicoes?: CondicaoAluno[];
 }
 
 type ViewState = 'LIST' | 'CREATE' | 'DETAIL';
 
 export default function StudentManager() {
-    // Inclui viewingSchoolId do AuthContext
-    const { API_BASE_URL, token, user, viewingSchoolId } = useAuth(); 
-    const [alunos, setAlunos] = useState<Aluno[]>([]);
-    const [view, setView] = useState<ViewState>('LIST');
-    const [searchTerm, setSearchTerm] = useState('');
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-    const [selectedAluno, setSelectedAluno] = useState<Aluno | null>(null);
+  const { API_BASE_URL, token, user, viewingSchoolId } = useAuth();
 
-    // Função para carregar os alunos da API (COM FILTRO DE ESCOLA)
-    const fetchAlunos = useCallback(async () => {
-        if (!token) {
-            setError('Sessão expirada. Por favor, faça login novamente.');
-            setLoading(false);
-            return;
-        }
+  const [alunos, setAlunos] = useState<Aluno[]>([]);
+  const [view, setView] = useState<ViewState>('LIST');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedAluno, setSelectedAluno] = useState<Aluno | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-        // 1. Determina o ID de filtro
-        // Admin usa viewingSchoolId; Supervisor/Professor usa user.escolaId (que é garantido pelo backend/AuthContext)
-        const escolaIdParaFiltrar = user?.acesso === 'Administrador' ? viewingSchoolId : user?.escolaId;
+  // ============================
+  // BUSCA DA API
+  // ============================
+  const fetchAlunos = useCallback(async () => {
+    if (!token) {
+      setError('Sessão expirada. Faça login novamente.');
+      setLoading(false);
+      return;
+    }
 
-        // Se o Admin não selecionou escola, ou se o usuário não tem escola, bloqueia a busca
-        if (!escolaIdParaFiltrar) {
-             setAlunos([]);
-             setLoading(false);
-             return; 
-        }
+    const escolaIdParaFiltrar =
+      user?.acesso === 'Administrador' ? viewingSchoolId : user?.escolaId;
 
-        setLoading(true);
-        setError(null);
-        try {
-            // Monta a URL para enviar o ID correto como query parameter
-            const url = `${API_BASE_URL}/api/alunos?viewingSchoolId=${escolaIdParaFiltrar}`;
-            
-            const response = await fetch(url, {
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`, // Envia o token para autenticar
-                },
-            });
+    if (!escolaIdParaFiltrar) {
+      setAlunos([]);
+      setLoading(false);
+      return;
+    }
 
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || `Falha ao carregar a lista de alunos.`);
-            }
+    setLoading(true);
+    setError(null);
 
-            const data: Aluno[] = await response.json();
-            setAlunos(data);
-        } catch (err) {
-            setError(err instanceof Error ? err.message : 'Erro ao conectar com a API.');
-        } finally {
-            setLoading(false);
-        }
-    }, [API_BASE_URL, token, user?.acesso, user?.escolaId, viewingSchoolId]); // Dependências
+    try {
+      const url = `${API_BASE_URL}/api/alunos?viewingSchoolId=${escolaIdParaFiltrar}`;
 
-    // Carrega a lista de alunos na montagem do componente e quando viewingSchoolId muda
-    useEffect(() => {
-        fetchAlunos();
-    }, [fetchAlunos]);
+      const response = await fetch(url, {
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      });
 
-    // Filtra a lista com base no termo de pesquisa
-    const filteredAlunos = alunos.filter(aluno =>
-        aluno.Nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        aluno.Matricula.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-    
-    // Função para voltar à lista e recarregar os dados
-    const handleReturnToList = () => {
-        setView('LIST');
-        fetchAlunos(); 
-        setSelectedAluno(null);
-    };
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Falha ao carregar os alunos.');
+      }
 
-    const handleAlunoClick = (aluno: Aluno) => {
-        setSelectedAluno(aluno);
-        setView('DETAIL');
-    };
+      const data: Aluno[] = await response.json();
+      setAlunos(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao conectar com a API.');
+    } finally {
+      setLoading(false);
+    }
+  }, [API_BASE_URL, token, user?.acesso, user?.escolaId, viewingSchoolId]);
 
-    const renderView = () => {
-        if (loading) {
-            return <p className="text-center text-gray-500 mt-8">A carregar alunos...</p>;
-        }
-        if (error) {
-            return <p className="text-center text-red-500 mt-8">Erro: {error}</p>;
-        }
-        
-        // Mensagem de bloqueio para o Admin sem escola selecionada
-        if (user?.acesso === 'Administrador' && !viewingSchoolId) {
-             return (
-                <div className="text-center p-12 bg-yellow-100 rounded-xl mt-8">
-                    <p className="text-xl font-semibold text-yellow-800">
-                        Por favor, selecione uma escola no cabeçalho superior para gerenciar os alunos.
-                    </p>
-                </div>
-            );
-        }
+  useEffect(() => {
+    fetchAlunos();
+  }, [fetchAlunos]);
 
+  // ============================
+  // FILTRO
+  // ============================
+  const filteredAlunos = alunos.filter(a =>
+    a.Nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    a.Matricula.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
-        switch (view) {
-            case 'CREATE':
-                // StudentCreate.tsx precisa da escolaId, que será o ID que o Admin está a visualizar
-                return <StudentCreate onCreated={handleReturnToList} onCancel={() => setView('LIST')} />;
+  const handleReturnToList = () => {
+    setView('LIST');
+    fetchAlunos();
+    setSelectedAluno(null);
+  };
 
-            case 'DETAIL':
-                // StudentDetail.tsx será criado no próximo passo
-                return selectedAluno ? (
-                    <StudentDetail aluno={selectedAluno} onDone={handleReturnToList} onCancel={() => setView('LIST')} />
-                ) : <p className="text-center text-red-500 mt-8">Aluno não selecionado.</p>;
+  const handleAlunoClick = (aluno: Aluno) => {
+    setSelectedAluno(aluno);
+    setView('DETAIL');
+  };
 
-            case 'LIST':
-            default:
-                return (
-                    <>
-                        <div className="flex justify-between items-center mb-6">
-                            <input
-                                type="text"
-                                placeholder="Pesquisar por nome ou matrícula..."
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                className="w-2/3 px-4 py-2 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-green-300 focus:outline-none"
-                            />
-                            <button
-                                onClick={() => setView('CREATE')}
-                                className="bg-green-400 text-white font-semibold py-2 px-4 rounded-xl whitespace-nowrap shadow-md hover:bg-green-600 transition-colors flex items-center"
-                            >
-                                Novo Aluno
-                            </button>
-                        </div>
+  // ============================
+  // VIEWS PADRONIZADAS
+  // ============================
+  if (loading) {
+    return <div className="text-center p-8 text-gray-500">Carregando alunos...</div>;
+  }
 
-                        <div className="bg-white rounded-xl shadow-lg overflow-hidden">
-                            {filteredAlunos.length === 0 && !searchTerm ? (
-                                <p className="p-6 text-center text-gray-500">Nenhum aluno foi cadastrado na escola atual.</p>
-                            ) : filteredAlunos.length === 0 && searchTerm ? (
-                                <p className="p-6 text-center text-gray-500">Nenhum aluno encontrado para "{searchTerm}".</p>
-                            ) : (
-                                <ul className="divide-y divide-gray-200">
-                                    {filteredAlunos.map((aluno) => (
-                                        <li
-                                            key={aluno.id}
-                                            onClick={() => handleAlunoClick(aluno)}
-                                            className="p-4 flex justify-between items-center hover:bg-green-50 cursor-pointer transition-colors"
-                                        >
-                                            <div>
-                                                <p className="text-lg font-medium text-gray-800">{aluno.Nome}</p>
-                                                <p className="text-sm text-gray-500">
-                                                    Matrícula: {aluno.Matricula} | Turma: {aluno.turma.Nome}
-                                                </p>
-                                            </div>
-                                            <span className="text-green-500 text-sm font-semibold">Detalhes &gt;</span>
-                                        </li>
-                                    ))}
-                                </ul>
-                            )}
-                        </div>
-                    </>
-                );
-        }
-    };
+  if (error) {
+    return <div className="text-center p-8 text-red-500">Erro: {error}</div>;
+  }
 
+  // Admin sem escola selecionada
+  if (user?.acesso === 'Administrador' && !viewingSchoolId) {
     return (
-        <div className="min-h-screen bg-gray-100 p-8">
-            <div className="w-full max-w-4xl mx-auto">
-                <h1 className="text-3xl font-extrabold text-gray-800 mb-8">Gerenciar Alunos</h1>
-                {view !== 'LIST' && (
-                    <button 
-                        onClick={() => handleReturnToList()} 
-                        className="mb-4 text-green-500 hover:underline flex items-center"
-                    >
-                        &lt; Voltar para a Lista
-                    </button>
-                )}
-                {renderView()}
-            </div>
+      <div className="w-full max-w-4xl mx-auto p-6 bg-white rounded-2xl shadow-xl mt-4">
+        <div className="text-center py-16">
+          <p className="text-xl font-bold text-gray-600">
+            Selecione uma escola no topo para visualizar os alunos.
+          </p>
         </div>
+      </div>
     );
+  }
+
+  if (view === 'CREATE') {
+    return <StudentCreate onCreated={handleReturnToList} onCancel={handleReturnToList} />;
+  }
+
+  if (view === 'DETAIL') {
+    return selectedAluno ? (
+      <StudentDetail aluno={selectedAluno} onDone={handleReturnToList} onCancel={() => setView('LIST')} />
+    ) : (
+      <div className="text-center p-8 text-gray-500">Nenhum aluno selecionado.</div>
+    );
+  }
+
+  // ============================
+  // LISTA PADRÃO (MODELO ESCOLAS)
+  // ============================
+  return (
+    <div className="w-full max-w-4xl mx-auto p-6 bg-white rounded-2xl shadow-xl mt-4">
+
+      {/* Cabeçalho */}
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-3xl font-bold text-gray-600">Gestão de Alunos</h1>
+
+        <button
+          onClick={() => setView('CREATE')}
+          className="bg-green-400 text-white font-semibold py-2 px-6 rounded-xl shadow-md hover:bg-green-600 transition-colors"
+        >
+          Novo Aluno
+        </button>
+      </div>
+
+      {/* Pesquisa */}
+      <div className="mb-6">
+        <input
+          type="text"
+          placeholder="Pesquisar por nome ou matrícula..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="w-full px-4 py-2 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-green-300 focus:outline-none"
+        />
+      </div>
+
+      {/* Lista / Tabela */}
+      {filteredAlunos.length === 0 ? (
+        <div className="text-center py-12 text-gray-500 text-lg">
+          {searchTerm
+            ? `Nenhum aluno encontrado para "${searchTerm}".`
+            : 'Nenhum aluno cadastrado nesta escola.'}
+        </div>
+      ) : (
+        <div className="overflow-hidden overflow-y-auto max-h-96 shadow-lg border border-gray-200 rounded-xl">
+          <table className="min-w-full divide-y divide-gray-200">
+
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Nome
+                </th>
+
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Matrícula
+                </th>
+
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Turma
+                </th>
+
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Ações
+                </th>
+              </tr>
+            </thead>
+
+            <tbody className="bg-white divide-y divide-gray-200">
+              {filteredAlunos.map((aluno) => (
+                <tr
+                  key={aluno.id}
+                  onClick={() => handleAlunoClick(aluno)}
+                  className="cursor-pointer hover:bg-gray-50 transition"
+                >
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                    {aluno.Nome}
+                  </td>
+
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {aluno.Matricula}
+                  </td>
+
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {aluno.turma.Nome}
+                  </td>
+
+                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                    <span className="text-green-500 hover:text-green-700">
+                      Ver Detalhes
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+
+          </table>
+        </div>
+      )}
+    </div>
+  );
 }

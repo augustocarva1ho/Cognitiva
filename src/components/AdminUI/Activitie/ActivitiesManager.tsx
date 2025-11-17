@@ -15,16 +15,15 @@ interface Professor {
     nome: string;
 }
 
-// CORRIGIDO: Atividade completa, incluindo todos os campos para evitar o erro 2739 no ActivityDetail
 interface Atividade {
     id: string;
     tipo: string;
     local: string;
-    tempoFinalizacao: string; // Adicionado
-    dinamica: string;          // Adicionado
-    comConsulta: boolean;      // Adicionado
-    liberdadeCriativa: boolean; // Adicionado
-    descricaoAdicional: string; // Adicionado
+    tempoFinalizacao: string;
+    dinamica: string;
+    comConsulta: boolean;
+    liberdadeCriativa: boolean;
+    descricaoAdicional: string;
     notaMaxima: number;
     escolaId: string;
     materia: Materia;
@@ -34,8 +33,8 @@ interface Atividade {
 type ViewState = 'LIST' | 'CREATE' | 'DETAIL';
 
 export default function ActivitiesManager() {
-    // Inclui viewingSchoolId do AuthContext
-    const { API_BASE_URL, token, user, viewingSchoolId } = useAuth(); 
+    const { API_BASE_URL, token, user, viewingSchoolId } = useAuth();
+
     const [atividades, setAtividades] = useState<Atividade[]>([]);
     const [view, setView] = useState<ViewState>('LIST');
     const [searchTerm, setSearchTerm] = useState('');
@@ -43,50 +42,41 @@ export default function ActivitiesManager() {
     const [error, setError] = useState<string | null>(null);
     const [selectedAtividade, setSelectedAtividade] = useState<Atividade | null>(null);
 
-    const isProfessor = user?.acesso === 'Professor';
     const canCreateOrEdit = user?.acesso === 'Administrador' || user?.acesso === 'Supervisor';
-    
-    // Função para carregar as atividades da API (COM FILTRO DE ESCOLA)
+
     const fetchAtividades = useCallback(async () => {
         if (!token) {
-            setError('Sessão expirada. Por favor, faça login novamente.');
+            setError('Sessão expirada. Faça login novamente.');
             setLoading(false);
             return;
         }
 
-        // 1. Determina o ID de filtro
-        const escolaIdParaFiltrar = user?.acesso === 'Administrador' ? viewingSchoolId : user?.escolaId;
+        const escolaIdParaFiltrar =
+            user?.acesso === 'Administrador' ? viewingSchoolId : user?.escolaId;
 
-        // Se o Administrador não selecionou escola, bloqueia a busca
-        if (user?.acesso === 'Administrador' && !escolaIdParaFiltrar) {
+        if (!escolaIdParaFiltrar) {
             setAtividades([]);
             setLoading(false);
             return;
         }
-        
-        // Se não for Admin e não tiver escola, também bloqueia a busca (embora o backend retorne 403)
-        if (user?.acesso !== 'Administrador' && !escolaIdParaFiltrar) {
-             setAtividades([]);
-             setLoading(false);
-             return;
-        }
 
         setLoading(true);
         setError(null);
-        try {
-            // Monta a URL para enviar o ID correto como query parameter
-            const url = `${API_BASE_URL}/api/atividades?viewingSchoolId=${escolaIdParaFiltrar}`;
 
-            const response = await fetch(url, {
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`, // Envia o token para autenticar
-                },
-            });
+        try {
+            const response = await fetch(
+                `${API_BASE_URL}/api/atividades?viewingSchoolId=${escolaIdParaFiltrar}`,
+                {
+                    headers: {
+                        'Content-Type': 'application/json',
+                        Authorization: `Bearer ${token}`,
+                    },
+                }
+            );
 
             if (!response.ok) {
                 const errorData = await response.json();
-                throw new Error(errorData.error || `Falha ao carregar a lista de atividades.`);
+                throw new Error(errorData.error || 'Falha ao carregar atividades.');
             }
 
             const data: Atividade[] = await response.json();
@@ -96,23 +86,21 @@ export default function ActivitiesManager() {
         } finally {
             setLoading(false);
         }
-    }, [API_BASE_URL, token, user?.acesso, user?.escolaId, viewingSchoolId]); 
+    }, [API_BASE_URL, token, user?.acesso, user?.escolaId, viewingSchoolId]);
 
-    // Carrega a lista de atividades na montagem do componente e quando viewingSchoolId muda
     useEffect(() => {
         fetchAtividades();
     }, [fetchAtividades]);
 
-    // Filtra a lista com base no termo de pesquisa
-    const filteredAtividades = atividades.filter(atividade =>
-        atividade.tipo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        atividade.materia.nome.toLowerCase().includes(searchTerm.toLowerCase())
+    const filteredAtividades = atividades.filter((atividade) =>
+        `${atividade.tipo} ${atividade.materia.nome}`
+            .toLowerCase()
+            .includes(searchTerm.toLowerCase())
     );
-    
-    // Função para voltar à lista e recarregar os dados
+
     const handleReturnToList = () => {
         setView('LIST');
-        fetchAtividades(); 
+        fetchAtividades();
         setSelectedAtividade(null);
     };
 
@@ -121,100 +109,134 @@ export default function ActivitiesManager() {
         setView('DETAIL');
     };
 
-    const renderView = () => {
-        if (loading) {
-            return <p className="text-center text-gray-500 mt-8">A carregar atividades...</p>;
-        }
-        if (error) {
-            return <p className="text-center text-red-500 mt-8">Erro: {error}</p>;
-        }
+    // ------------------ RENDER PRINCIPAL ------------------ //
 
-        // Se for Admin e não selecionou uma escola, mostra mensagem
-        if (user?.acesso === 'Administrador' && !viewingSchoolId) {
-            return (
-                <div className="text-center p-12 bg-yellow-100 rounded-xl mt-8">
-                    <p className="text-xl font-semibold text-yellow-800">
-                        Por favor, selecione uma escola acima para gerenciar as atividades.
-                    </p>
-                </div>
-            );
-        }
+    if (loading) {
+        return <div className="text-center p-8 text-gray-500">Carregando atividades...</div>;
+    }
 
-        switch (view) {
-            case 'CREATE':
-                
-                return <ActivityCreate escolaId={viewingSchoolId || user?.escolaId} onCreated={handleReturnToList} onCancel={() => setView('LIST')} />;
+    if (error) {
+        return <div className="text-center p-8 text-red-500">Erro: {error}</div>;
+    }
 
-            case 'DETAIL':
-                return selectedAtividade ? (
-                    // CORRIGIDO: A interface Atividade completa agora é passada corretamente
-                    <ActivityDetail atividade={selectedAtividade} onDone={handleReturnToList} onCancel={() => setView('LIST')} />
-                ) : <p className="text-center text-red-500 mt-8">Atividade não selecionada.</p>;
+    // Bloqueio para Administrador sem escola selecionada
+    if (user?.acesso === 'Administrador' && !viewingSchoolId) {
+        return (
+            <div className="text-center p-12 bg-yellow-100 rounded-xl mt-8">
+                <p className="text-xl font-semibold text-yellow-800">
+                    Por favor, selecione uma escola acima para gerenciar as atividades.
+                </p>
+            </div>
+        );
+    }
 
-            case 'LIST':
-            default:
-                return (
-                    <>
-                        <div className="flex justify-between items-center mb-6">
-                            <input
-                                type="text"
-                                placeholder="Pesquisar por tipo ou matéria..."
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                className="w-2/3 px-4 py-2 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-green-300 focus:outline-none"
-                            />
-                            {canCreateOrEdit && (
-                                <button
-                                    onClick={() => setView('CREATE')}
-                                    className="bg-green-400 text-white font-semibold py-2 px-4 rounded-xl whitespace-nowrap shadow-md hover:bg-green-600 transition-colors flex items-center"
-                                >
-                                    Nova Atividade
-                                </button>
-                            )}
-                        </div>
+    // --- CREATE ---
+    if (view === 'CREATE') {
+        return (
+            <ActivityCreate
+                escolaId={viewingSchoolId || user?.escolaId}
+                onCreated={handleReturnToList}
+                onCancel={handleReturnToList}
+            />
+        );
+    }
 
-                        <div className="bg-white rounded-xl shadow-lg overflow-hidden">
-                            {filteredAtividades.length === 0 ? (
-                                <p className="p-6 text-center text-gray-500">Nenhuma atividade cadastrada na escola atual.</p>
-                            ) : (
-                                <ul className="divide-y divide-gray-200">
-                                    {filteredAtividades.map((atividade) => (
-                                        <li
-                                            key={atividade.id}
-                                            onClick={() => canCreateOrEdit && handleAtividadeClick(atividade)}
-                                            className={`p-4 flex justify-between items-center hover:bg-green-50 transition-colors ${canCreateOrEdit ? 'cursor-pointer' : ''}`}
-                                        >
-                                            <div>
-                                                <p className="text-lg font-medium text-gray-800">{atividade.tipo} ({atividade.materia.nome})</p>
-                                                <p className="text-sm text-gray-500">
-                                                    Professor: {atividade.professor.nome} | Local: {atividade.local}
-                                                </p>
-                                            </div>
-                                            {canCreateOrEdit && <span className="text-green-500 text-sm font-semibold">Detalhes &gt;</span>}
-                                        </li>
-                                    ))}
-                                </ul>
-                            )}
-                        </div>
-                    </>
-                );
-        }
-    };
+    // --- DETAIL ---
+    if (view === 'DETAIL') {
+        return selectedAtividade ? (
+            <ActivityDetail
+                atividade={selectedAtividade}
+                onDone={handleReturnToList}
+                onCancel={() => setView('LIST')}
+            />
+        ) : (
+            <div className="text-center p-8 text-gray-500">Atividade não encontrada.</div>
+        );
+    }
+
+    // ------------------ LIST VIEW ------------------ //
 
     return (
-        <div className="min-h-screen bg-gray-100 p-8">
-            <div className="w-full max-w-4xl mx-auto">
-                <h1 className="text-3xl font-extrabold text-gray-800 mb-8">Gerenciar Atividades</h1>
-                {view !== 'LIST' && (
-                    <button 
-                        onClick={() => handleReturnToList()} 
-                        className="mb-4 text-green-500 hover:underline flex items-center"
+        <div className="w-full max-w-4xl mx-auto p-6 bg-white rounded-2xl shadow-xl mt-4">
+            <div className="flex justify-between items-center mb-6">
+                <h1 className="text-3xl font-bold text-gray-600">Gestão de Atividades</h1>
+
+                {canCreateOrEdit && (
+                    <button
+                        onClick={() => setView('CREATE')}
+                        className="bg-green-400 text-white font-semibold py-2 px-6 rounded-xl shadow-md hover:bg-green-600 transition-colors"
                     >
-                        &lt; Voltar para a Lista
+                        Nova Atividade
                     </button>
                 )}
-                {renderView()}
             </div>
+
+            <div className="mb-6">
+                <input
+                    type="text"
+                    placeholder="Pesquisar por tipo ou matéria..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-green-300 focus:outline-none"
+                />
+            </div>
+
+            {filteredAtividades.length === 0 ? (
+                <div className="text-center py-12 text-gray-500 text-lg">
+                    {searchTerm
+                        ? `Nenhuma atividade encontrada para "${searchTerm}".`
+                        : 'Nenhuma atividade cadastrada.'}
+                </div>
+            ) : (
+                <div className="overflow-hidden overflow-y-auto max-h-96 shadow-lg border border-gray-200 rounded-xl">
+                    <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                            <tr>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Tipo
+                                </th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Matéria
+                                </th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Professor
+                                </th>
+                                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Ações
+                                </th>
+                            </tr>
+                        </thead>
+
+                        <tbody className="bg-white divide-y divide-gray-200">
+                            {filteredAtividades.map((atividade) => (
+                                <tr
+                                    key={atividade.id}
+                                    onClick={() => canCreateOrEdit && handleAtividadeClick(atividade)}
+                                    className={`cursor-pointer hover:bg-gray-50`}
+                                >
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                        {atividade.tipo}
+                                    </td>
+
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                        {atividade.materia.nome}
+                                    </td>
+
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                        {atividade.professor.nome}
+                                    </td>
+
+                                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                        <span className="text-green-500 hover:text-green-700">
+                                            Ver Detalhes
+                                        </span>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            )}
         </div>
     );
 }

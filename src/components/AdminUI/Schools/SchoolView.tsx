@@ -63,10 +63,10 @@ export default function SchoolView() {
     }
 
     return (
-        <div className="w-full max-w-xl mx-auto p-8 bg-white rounded-2xl shadow-xl mt-4 border-t-4 border-green-500">
+        <div className="w-full max-w-xl mx-auto p-8 bg-white rounded-2xl shadow-xl mt-4 border-t-4 border-green-300">
             <div className="flex items-center space-x-4 mb-6">
                 {/* [Icon of a school building] */}
-                <h1 className="text-3xl font-bold text-green-600">Minha Escola</h1>
+                <h1 className="text-3xl font-bold text-green-300">Minha Escola</h1>
             </div>
             
             {escola ? (
@@ -81,8 +81,8 @@ export default function SchoolView() {
                     </div>
                     
                     {/* Informação adicional para o usuário */}
-                    <p className="pt-4 text-sm text-blue-600">
-                        {user?.acesso}s não têm permissão para editar estas informações.
+                    <p className="pt-4 text-sm text-red-600">
+                        {user?.acesso} não têm permissão para editar estas informações.
                     </p>
                 </div>
             ) : (

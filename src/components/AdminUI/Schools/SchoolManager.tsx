@@ -137,7 +137,7 @@ export default function SchoolManager() {
                     {searchTerm ? `Nenhuma escola encontrada para "${searchTerm}".` : "Nenhuma escola cadastrada ainda."}
                 </div>
             ) : (
-                <div className="overflow-hidden shadow-lg border border-gray-200 rounded-xl">
+                <div className="overflow-hidden overflow-y-auto max-h-96 shadow-lg border border-gray-200 rounded-xl">
                     <table className="min-w-full divide-y divide-gray-200">
                         <thead className="bg-gray-50">
                             <tr>

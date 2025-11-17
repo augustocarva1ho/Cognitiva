@@ -4,7 +4,6 @@ import { useAuth } from '@/context/AuthContext';
 import SubjectCreate from './SubjectCreate';
 import SubjectDetail from './SubjectDetail';
 
-// Tipos base (devem ser definidos no seu projeto)
 interface Materia {
     id: string;
     nome: string;
@@ -15,9 +14,8 @@ interface Materia {
 type ViewState = 'LIST' | 'CREATE' | 'DETAIL';
 
 export default function SubjectManager() {
-    // Importa o ID de visualização global (viewingSchoolId)
-    const { API_BASE_URL, token, user, viewingSchoolId } = useAuth(); 
-    
+    const { API_BASE_URL, token, user, viewingSchoolId } = useAuth();
+
     const [materias, setMaterias] = useState<Materia[]>([]);
     const [view, setView] = useState<ViewState>('LIST');
     const [searchTerm, setSearchTerm] = useState('');
@@ -27,8 +25,10 @@ export default function SubjectManager() {
 
     const isProfessor = user?.acesso === 'Professor';
     const canCreateOrEdit = user?.acesso === 'Administrador' || user?.acesso === 'Supervisor';
-    
-    // Função para carregar as matérias da API
+
+    const escolaIdParaFiltrar =
+        user?.acesso === 'Administrador' ? viewingSchoolId : user?.escolaId;
+
     const fetchMaterias = useCallback(async () => {
         if (!token) {
             setError('Sessão expirada. Por favor, faça login novamente.');
@@ -36,10 +36,6 @@ export default function SubjectManager() {
             return;
         }
 
-        // Determina qual ID usar para o filtro (visualmente selecionado para Admin, ou padrão para outros)
-        const escolaIdParaFiltrar = user?.acesso === 'Administrador' ? viewingSchoolId : user?.escolaId;
-
-        // Se for Admin e o ID de visualização for nulo, paramos a busca (exibe a mensagem)
         if (user?.acesso === 'Administrador' && !escolaIdParaFiltrar) {
             setMaterias([]);
             setLoading(false);
@@ -48,21 +44,19 @@ export default function SubjectManager() {
 
         setLoading(true);
         setError(null);
-        try {
-            // Monta a URL para enviar o ID correto como query parameter
-            const queryParam = escolaIdParaFiltrar ? `?viewingSchoolId=${escolaIdParaFiltrar}` : '';
-            const url = `${API_BASE_URL}/api/materias${queryParam}`;
 
-            const response = await fetch(url, {
+        try {
+            const queryParam = escolaIdParaFiltrar ? `?viewingSchoolId=${escolaIdParaFiltrar}` : '';
+            const response = await fetch(`${API_BASE_URL}/api/materias${queryParam}`, {
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`, // Envia o token para autenticar
+                    'Authorization': `Bearer ${token}`,
                 },
             });
 
             if (!response.ok) {
                 const errorData = await response.json();
-                throw new Error(errorData.error || `Falha ao carregar a lista de matérias. Status: ${response.status}`);
+                throw new Error(errorData.error || 'Falha ao carregar matérias.');
             }
 
             const data: Materia[] = await response.json();
@@ -74,121 +68,151 @@ export default function SubjectManager() {
         }
     }, [API_BASE_URL, token, user?.acesso, user?.escolaId, viewingSchoolId]);
 
-    // Carrega a lista de matérias na montagem do componente e quando o viewingSchoolId muda
     useEffect(() => {
         fetchMaterias();
     }, [fetchMaterias]);
 
-    // Filtra a lista com base no termo de pesquisa
-    const filteredMaterias = materias.filter(materia =>
-        materia.nome.toLowerCase().includes(searchTerm.toLowerCase())
+    const filteredMaterias = materias.filter(m =>
+        m.nome.toLowerCase().includes(searchTerm.toLowerCase())
     );
-    
-    // Função para voltar à lista e recarregar os dados
+
     const handleReturnToList = () => {
         setView('LIST');
-        fetchMaterias(); 
+        fetchMaterias();
         setSelectedMateria(null);
     };
 
     const handleMateriaClick = (materia: Materia) => {
+        if (!canCreateOrEdit) return;
         setSelectedMateria(materia);
         setView('DETAIL');
     };
 
-    const renderView = () => {
-        if (loading) {
-            return <p className="text-center text-gray-500 mt-8">A carregar matérias...</p>;
-        }
-        if (error) {
-            return <p className="text-center text-red-500 mt-8">Erro: {error}</p>;
-        }
+    // ----------------------------------------
+    // Renderização Condicional (modelo referência)
+    // ----------------------------------------
 
-        // Se for Admin e não selecionou uma escola, mostra mensagem
-        if (user?.acesso === 'Administrador' && !viewingSchoolId) {
-            return (
-                <div className="text-center p-12 bg-yellow-100 rounded-xl mt-8">
-                    <p className="text-xl font-semibold text-yellow-800">
-                        Por favor, selecione uma escola acima para gerenciar as matérias.
-                    </p>
-                </div>
-            );
-        }
+    if (user?.acesso === 'Administrador' && !viewingSchoolId) {
+        return (
+            <div className="text-center p-8 text-yellow-700 bg-yellow-100 rounded-xl mt-8">
+                Selecione uma escola para visualizar as matérias.
+            </div>
+        );
+    }
 
-        switch (view) {
-            case 'CREATE':
-                // O SubjectCreate precisa de saber qual escola usar (viewingSchoolId)
-                return <SubjectCreate escolaId={viewingSchoolId || user?.escolaId} onCreated={handleReturnToList} onCancel={() => setView('LIST')} />;
+    if (loading) {
+        return <div className="text-center p-8 text-gray-500">Carregando matérias...</div>;
+    }
 
-            case 'DETAIL':
-                return selectedMateria ? (
-                    <SubjectDetail materia={selectedMateria} onDone={handleReturnToList} onCancel={() => setView('LIST')} />
-                ) : <p className="text-center text-red-500 mt-8">Matéria não selecionada.</p>;
+    if (error) {
+        return <div className="text-center p-8 text-red-500">Erro: {error}</div>;
+    }
 
-            case 'LIST':
-            default:
-                return (
-                    <>
-                        <div className="flex justify-between items-center mb-6">
-                            <input
-                                type="text"
-                                placeholder="Pesquisar por nome da matéria..."
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                className="w-2/3 px-4 py-2 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-green-300 focus:outline-none"
-                            />
-                            {canCreateOrEdit && (
-                                <button
-                                    onClick={() => setView('CREATE')}
-                                    className="bg-green-400 text-white font-semibold py-2 px-4 rounded-xl shadow-md whitespace-nowrap  hover:bg-green-600 transition-colors flex items-center"
-                                >
-                                    Nova Matéria
-                                </button>
-                            )}
-                        </div>
+    if (view === 'CREATE') {
+        return (
+            <SubjectCreate
+                escolaId={viewingSchoolId || user?.escolaId}
+                onCreated={handleReturnToList}
+                onCancel={handleReturnToList}
+            />
+        );
+    }
 
-                        <div className="bg-white rounded-xl shadow-lg overflow-hidden">
-                            {filteredMaterias.length === 0 ? (
-                                <p className="p-6 text-center text-gray-500">Nenhuma matéria cadastrada na escola atual.</p>
-                            ) : (
-                                <ul className="divide-y divide-gray-200">
-                                    {filteredMaterias.map((materia) => (
-                                        <li
-                                            key={materia.id}
-                                            onClick={() => canCreateOrEdit && handleMateriaClick(materia)}
-                                            className={`p-4 flex justify-between items-center hover:bg-green-50 transition-colors ${canCreateOrEdit ? 'cursor-pointer' : ''}`}
-                                        >
-                                            <div>
-                                                <p className="text-lg font-medium text-gray-800">{materia.nome}</p>
-                                                <p className="text-sm text-gray-500">
-                                                    Atividades cadastradas: {materia.atividades.length}
-                                                </p>
-                                            </div>
-                                            {canCreateOrEdit && <span className="text-green-500 text-sm font-semibold">Detalhes &gt;</span>}
-                                        </li>
-                                    ))}
-                                </ul>
-                            )}
-                        </div>
-                    </>
-                );
-        }
-    };
+    if (view === 'DETAIL') {
+        return selectedMateria ? (
+            <SubjectDetail
+                materia={selectedMateria}
+                onDone={handleReturnToList}
+                onCancel={() => setView('LIST')}
+            />
+        ) : (
+            <div className="text-center p-8 text-gray-500">Nenhuma matéria selecionada.</div>
+        );
+    }
+
+    // ----------------------------------------
+    // LIST VIEW (modelo referência)
+    // ----------------------------------------
 
     return (
-        <div className="min-h-screen bg-gray-100 p-8">
-            <div className="w-full max-w-4xl mx-auto">
-                <h1 className="text-3xl font-extrabold text-gray-800 mb-8">Gerenciar Matérias</h1>
-                {view !== 'LIST' && (
-                    <button 
-                        onClick={() => handleReturnToList()} 
-                        className="mb-4 text-green-500 hover:underline flex items-center"
+        <div className="w-full max-w-4xl mx-auto p-6 bg-white rounded-2xl shadow-xl mt-4">
+
+            {/* Cabeçalho */}
+            <div className="flex justify-between items-center mb-6">
+                <h1 className="text-3xl font-bold text-gray-600">Gestão de Matérias</h1>
+
+                {canCreateOrEdit && (
+                    <button
+                        onClick={() => setView('CREATE')}
+                        className="bg-green-400 text-white font-semibold py-2 px-6 rounded-xl shadow-md hover:bg-green-600 transition-colors"
                     >
-                        &lt; Voltar para a Lista
+                        Nova Matéria
                     </button>
                 )}
-                {renderView()}
             </div>
+
+            {/* Pesquisa */}
+            <div className="mb-6">
+                <input
+                    type="text"
+                    placeholder="Pesquisar por nome da matéria..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-xl shadow-sm focus:ring-2 focus:ring-green-300 focus:outline-none"
+                />
+            </div>
+
+            {/* Lista */}
+            {filteredMaterias.length === 0 ? (
+                <div className="text-center py-12 text-gray-500 text-lg">
+                    {searchTerm
+                        ? `Nenhuma matéria encontrada para "${searchTerm}".`
+                        : "Nenhuma matéria cadastrada ainda."}
+                </div>
+            ) : (
+                <div className="overflow-hidden overflow-y-auto max-h-96 shadow-lg border border-gray-200 rounded-xl">
+                    <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                            <tr>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Nome
+                                </th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Atividades
+                                </th>
+                                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Ações
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                            {filteredMaterias.map((materia) => (
+                                <tr
+                                    key={materia.id}
+                                    onClick={() => handleMateriaClick(materia)}
+                                    className={`cursor-pointer hover:bg-gray-50 transition-colors ${
+                                        !canCreateOrEdit ? 'cursor-default' : ''
+                                    }`}
+                                >
+                                    <td className="px-6 py-4 text-sm font-medium text-gray-900">
+                                        {materia.nome}
+                                    </td>
+                                    <td className="px-6 py-4 text-sm text-gray-500">
+                                        {materia.atividades.length}
+                                    </td>
+                                    <td className="px-6 py-4 text-right text-sm font-medium">
+                                        {canCreateOrEdit && (
+                                            <span className="text-green-500 hover:text-green-700">
+                                                Ver Detalhes
+                                            </span>
+                                        )}
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            )}
         </div>
     );
 }
