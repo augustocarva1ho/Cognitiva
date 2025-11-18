@@ -358,7 +358,7 @@ export default function ClassUI() {
 
           {/* Exibição do Nome do Aluno Selecionado (Simplesmente para fixar a informação) */}
           {selectedAluno && (
-              <h2 className="ml-auto text-xl font-extrabold text-green-400">
+              <h2 className="ml-auto text-2xl font-extrabold text-green-400 border-b shadow-sm px-6">
                   {selectedAluno.Nome}
               </h2>
           )}

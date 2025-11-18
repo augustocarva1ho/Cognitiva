@@ -121,7 +121,7 @@ export default function SchoolDetail({ escola, onDone, onCancel }: SchoolDetailP
         : '';
 
     return (
-        <div className="w-full max-w-lg mx-auto p-8 bg-white rounded-2xl shadow-xl mt-4">
+        <div className="w-full max-w-4xl mx-auto p-6 bg-white rounded-2xl shadow-xl mt-4">
             <h2 className="text-2xl font-bold text-green-600 mb-6 text-center">Editar Escola: {escola.nome}</h2>
             
             {message && (

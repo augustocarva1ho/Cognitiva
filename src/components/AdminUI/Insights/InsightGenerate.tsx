@@ -122,7 +122,7 @@ export default function InsightGenerate({ alunoId, onSaved, onCancel }: InsightG
 
       {/* Seção de Dados para Conferência */}
       <div className="bg-gray-100 p-6 rounded-xl shadow-inner mb-6 border-b">
-        <h3 className="text-xl font-semibold text-gray-800 mb-2">Dados de Entrada (JSON)</h3>
+        <h3 className="text-xl font-semibold text-gray-800 mb-2">Dados de Entrada</h3>
         <p className="text-sm text-gray-600 mb-4">
           Confirme que os dados abaixo estão atualizados. Estes são os dados que o Gemini irá analisar.
         </p>

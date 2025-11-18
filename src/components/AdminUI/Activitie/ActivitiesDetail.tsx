@@ -225,7 +225,7 @@ export default function ActivityDetail({ atividade, onDone, onCancel }: Activity
     const currentProfessorName = professores.find(p => p.id === formData.professorId)?.nome || atividade.professor.nome;
 
   return (
-    <div className="w-full max-w-2xl mx-auto bg-white rounded-2xl shadow-xl p-8 mt-4">
+    <div className="w-full max-w-4xl mx-auto p-6 bg-white rounded-2xl shadow-xl mt-4">
       <h2 className="text-2xl font-bold text-green-500 mb-6 text-center">Detalhes e Edição de Atividade</h2>
       
       {message && (

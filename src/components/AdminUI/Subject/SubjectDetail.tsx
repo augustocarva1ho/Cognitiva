@@ -126,7 +126,7 @@ export default function SubjectDetail({ materia, onDone, onCancel }: SubjectDeta
         : '';
 
     return (
-        <div className="w-full max-w-lg mx-auto p-8 bg-white rounded-2xl shadow-xl mt-4">
+        <div className="w-full max-w-4xl mx-auto p-6 bg-white rounded-2xl shadow-xl mt-4">
             <h2 className="text-2xl font-bold text-green-600 mb-6 text-center">Editar Matéria: {materia.nome}</h2>
             
             {message && (

@@ -22,7 +22,15 @@ export default function InsightDetail({ insight, onCancel }: InsightDetailProps)
 
   return (
     <div className="w-full max-w-4xl mx-auto bg-white rounded-2xl shadow-xl p-8 mt-4">
-      <h2 className="text-2xl font-bold text-gray-800 mb-6">Detalhes do Insight</h2>
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-2xl font-bold text-gray-800 mb-6">Detalhes do Insight</h2>
+        <button
+            onClick={onCancel}
+            className="w-full md:w-auto bg-gray-300 text-gray-700 font-semibold py-2 px-6 rounded-xl shadow-md hover:bg-gray-400 transition-colors"
+          >
+            Voltar para a Lista
+          </button>
+        </div>
       <div className="bg-gray-100 p-6 rounded-xl shadow-inner mb-6">
         <h3 className="text-xl font-semibold text-gray-800 mb-2">Dados de Entrada para a IA</h3>
         <p className="text-sm text-gray-600 mb-4">

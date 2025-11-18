@@ -69,8 +69,16 @@ export default function LoginModal({ isOpen, onClose }: LoginModalProps) {
       // Log de sucesso
       console.log('[LoginModal] Sucesso: Login concluído e token recebido.');
       login(data.token, data.user);
-      onClose(); // Fecha o modal após o sucesso
 
+      // Abrir os modais de termos/política depois do login válido
+      sessionStorage.setItem("pendingUserLogin", "true");
+
+      // Fecha modal de login
+      onClose();
+
+      // Redireciona para a Home (ou mantenha na mesma página)
+      router.push("/");
+      
     } catch (err) {
       // Este erro geralmente é de rede, DNS ou CORS
       console.error('[LoginModal] Erro de rede ou interno:', err);

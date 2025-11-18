@@ -263,7 +263,7 @@ export default function StudentDetail({ aluno, onDone, onCancel }: StudentDetail
     : '';
 
   return (
-    <div className="w-full mx-auto p-4 md:p-8 bg-gray-50 min-h-screen">
+    <div className="w-full max-w-6xl mx-auto p-6 bg-white rounded-2xl shadow-xl mt-4">
       <div className="bg-white rounded-2xl shadow-xl p-6 md:p-8">
         <h2 className="text-2xl font-bold text-green-600 mb-6 text-center">Detalhes e Edição de Aluno</h2>
         {message && (

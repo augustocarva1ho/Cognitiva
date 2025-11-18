@@ -32,6 +32,8 @@ interface AuthContextType {
   login: (jwtToken: string, userData: AuthUser) => void;
   logout: () => void;
   API_BASE_URL: string;
+  needsTermsPopup: boolean;
+  setNeedsTermsPopup: (value: boolean) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -40,6 +42,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
+  // --- NOVO: controla exibição do popup de termos ---
+  const [needsTermsPopup, setNeedsTermsPopup] = useState(false);
+
   // NOVO ESTADO: Inicializa com o valor armazenado ou null
   const [viewingSchoolId, setViewingSchoolId] = useState<string | null>(null); 
   
@@ -71,6 +76,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     
     setToken(jwtToken);
     setUser(userData);
+
+    setNeedsTermsPopup(true);
     
     // NOVO: Define a escola principal como a escola de visualização padrão
     if (userData.escolaId) {
@@ -126,7 +133,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     <AuthContext.Provider value={{ 
         user, token, isLoggedIn: !!token, isLoadingAuth, 
         viewingSchoolId, setViewingSchoolId: updateViewingSchoolId, // Exporta a função de atualização
-        login, logout, API_BASE_URL 
+        login, logout, API_BASE_URL,
+        needsTermsPopup, setNeedsTermsPopup,
     }}>
       {children}
     </AuthContext.Provider>

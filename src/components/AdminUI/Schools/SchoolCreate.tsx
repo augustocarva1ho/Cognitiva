@@ -61,7 +61,7 @@ export default function SchoolCreate({ onCreated, onCancel }: SchoolCreateProps)
     : '';
 
   return (
-    <div className="w-full max-w-lg mx-auto bg-white rounded-2xl shadow-xl p-8 mt-4">
+    <div className="w-full max-w-4xl mx-auto p-6 bg-white rounded-2xl shadow-xl mt-4">
       <h2 className="text-2xl font-bold text-green-500 mb-6 text-center">Cadastrar Nova Escola</h2>
       
       {message && (
