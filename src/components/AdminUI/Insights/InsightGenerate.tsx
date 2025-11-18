@@ -28,8 +28,9 @@ interface InsightGenerateProps {
 }
 
 export default function InsightGenerate({ alunoId, onSaved, onCancel }: InsightGenerateProps) {
-  const { API_BASE_URL, token, user } = useAuth();
+  const { API_BASE_URL, token, user, viewingSchoolId } = useAuth();
   const router = useRouter();
+
   // O state armazena o objeto Aluno completo diretamente
   const [alunoData, setAlunoData] = useState<AlunoComDadosCompletos | null>(null);
   //const [prompt, setPrompt] = useState('Analise o histórico de desempenho e condições do aluno. Forneça um resumo dos pontos fortes e fracos e três sugestões específicas para o professor adaptar as atividades e o ambiente de aprendizagem.');
@@ -44,8 +45,19 @@ export default function InsightGenerate({ alunoId, onSaved, onCancel }: InsightG
     if (!token || !alunoId) return;
     setLoadingData(true);
     setError(null);
+
+    //  Determina o ID de operação para o query param
+    const escolaDeOperacao = user?.acesso === 'Administrador' ? viewingSchoolId : user?.escolaId;
+    const queryParam = escolaDeOperacao ? `?viewingSchoolId=${escolaDeOperacao}` : ''; 
+
+    if (!escolaDeOperacao) {
+        setError('ID da escola de operação não definido.');
+        setLoadingData(false);
+        return;
+    }
+
     try {
-      const response = await fetch(`${API_BASE_URL}/api/alunos/${alunoId}/full-data`, {
+      const response = await fetch(`${API_BASE_URL}/api/alunos/${alunoId}/full-data${queryParam}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       
@@ -63,7 +75,7 @@ export default function InsightGenerate({ alunoId, onSaved, onCancel }: InsightG
 
   useEffect(() => {
     fetchAlunoData();
-  }, [alunoId, token]);
+  }, [alunoId, token, user?.escolaId, user?.acesso, user?.nome, viewingSchoolId]);
 
   const handleGenerate = async () => {
     if (!alunoData || generating) return;
@@ -71,14 +83,18 @@ export default function InsightGenerate({ alunoId, onSaved, onCancel }: InsightG
     setError(null);
     setInsightText('');
 
+    // Determina o ID de operação para o query param (necessário para a validação do POST no backend)
+    const escolaDeOperacao = user?.acesso === 'Administrador' ? user?.escolaId : user?.escolaId; // Usa o ID de filtro se for Admin
+    const queryParam = escolaDeOperacao ? `?viewingSchoolId=${escolaDeOperacao}` : '';
+
     try {
-      const response = await fetch(`${API_BASE_URL}/api/insights/aluno/${alunoId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/insights/aluno/${alunoId}${queryParam}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
-        body: JSON.stringify({ prompt: prompt }),
+        body: JSON.stringify({}),
       });
 
       if (!response.ok) {
