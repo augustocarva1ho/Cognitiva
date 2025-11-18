@@ -20,7 +20,7 @@ export default function Home() {
       <div id="home" className="flex gap-[32px] row-start-2 items-center sm:items-start mt-16">
           <div>
             <div className="flex gap-3 items-baseline">
-              <h1 className="text-4xl text-zinc-700 font-bold">Olá, Bem vindo à</h1>
+              <h1 className="text-4xl text-zinc-700 font-bold">Olá, bem-vindo à</h1>
               <h1 className="text-5xl text-green-300 font-bold">COGNITIVA</h1>
             </div> 
             <div className="flex flex-col w-[560px] mt-4 gap-4 text-zinc-600 font-medium">           
@@ -30,7 +30,7 @@ Unimos tecnologia e sensibilidade humana para oferecer uma experiência educacio
 Por meio de inteligência artificial e análise de dados educacionais, a plataforma interpreta informações acadêmicas e socioemocionais, transformando-as em insights personalizados e recomendações práticas.
 </p>
               <p className="px-3 break-words whitespace-normal">Aqui, a educação se molda às necessidades de cada aluno, valorizando a diversidade como base para o aprendizado.
-Promovemos inclusão, empatia e equidade, unindo escolas, famílias e tecnologia em uma jornada de ensino mais humana e significativa. <br /><br /> Interessado em nosso serviço? Clique em Saiba Mais, e veja como funciona nossa aplicação!</p>
+Promovemos inclusão, empatia e equidade, unindo escolas, famílias e tecnologia em uma jornada de ensino mais humana e significativa. <br /><br /> Interessado em nosso serviço? Clique em "Saiba Mais" e veja como funciona nossa aplicação!</p>
               <button onClick={scrollToSobreNos} className="bg-zinc-50 text-green-300 border-4 border-green-300 w-40 h-10 rounded-full hover:bg-green-300 hover:text-zinc-50 transition">Saiba Mais</button>
             </div>
           </div>
@@ -80,7 +80,7 @@ Nossa plataforma foi desenvolvida para apoiar escolas, professores e famílias n
 
       <div id="noticias" className="gap-[32px] items-center justify-items-center mt-16">
         <div className=" gap-3 items-baseline">
-          <h1 className="text-4xl text-zinc-700 font-bold">Beneficos da Congntiva</h1>
+          <h1 className="text-4xl text-zinc-700 font-bold">Benefícios da Cognitiva</h1>
         </div> 
         <div className="w-[1120px] mt-4 gap-4 text-zinc-600 font-medium">           
           <p className="px-3 break-words whitespace-normal">A COGNITIVA traz uma nova perspectiva para a educação inclusiva, combinando tecnologia, empatia e dados para aprimorar o acompanhamento de alunos neurodivergentes e fortalecer o papel do educador.
@@ -88,7 +88,7 @@ Nossa plataforma foi desenvolvida para apoiar escolas, professores e famílias n
 Entre os principais benefícios estão: <br /><br />
  - Melhoria na comunicação entre escola e família, fortalecendo o vínculo e a colaboração no processo educativo.<br />
  - Maior autonomia para professores, que passam a ter uma visão completa do progresso dos estudantes e podem ajustar suas estratégias de forma rápida e assertiva. <br />
- - Tomada de decisão baseada em dados reais, eliminando suposições e permitindo que intervenções pedagógicas sejam mais concisas. <br /><br />
+ - Tomada de decisão baseada em dados reais, eliminando suposições e permitindo que intervenções pedagógicas sejam mais eficazes. <br /><br />
 
 Com esses benefícios, a COGNITIVA se posiciona como uma ferramenta capaz de tornar a inclusão uma prática concreta, promovendo resultados reais para educadores, estudantes e instituições. </p>
         </div>
@@ -102,7 +102,7 @@ Com esses benefícios, a COGNITIVA se posiciona como uma ferramenta capaz de tor
           <p className="px-3 break-words whitespace-normal">Quer saber mais sobre a COGNITIVA ou conversar com nossa equipe?
 Estamos disponíveis para tirar dúvidas, receber sugestões e compartilhar mais detalhes sobre como a plataforma pode apoiar escolas, professores e famílias.
 Preencha o formulário abaixo ou envie uma mensagem — teremos prazer em falar com você!</p> <br />
-          <p className="px-3 break-words whitespace-normal"> 📧 contato@cognitiva.com.br | 💬 Formulario: FormsCognitiva.com.br </p>
+          <p className="px-3 break-words whitespace-normal"> 📧 contato@cognitiva.com.br | 💬 Formulário: FormsCognitiva.com.br </p>
         </div>
       </div>
       <Bot/>
