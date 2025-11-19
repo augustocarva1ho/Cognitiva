@@ -57,9 +57,10 @@ export default function TermsModal() {
   // --- Conteúdo dinâmico ---
   const getText = () => {
     if (type === "terms" || type === "onlyterms") {
-      return "Aqui ficam os termos de uso...";
+      return "O Cognitiva utiliza apenas os dados necessários para análise educacional e geração de insights. Todas as informações são tratadas com segurança e nunca compartilhadas sem autorização. Para prosseguir, aceite o termo de uso."
     }
-    return "Aqui fica a política de privacidade...";
+    return "O Cognitiva coleta apenas os dados necessários para análises pedagógicas e geração de insights personalizados. Todas as informações são protegidas, utilizadas exclusivamente dentro da plataforma e tratadas conforme as diretrizes da LGPD."
+;
   };
 
   return (
