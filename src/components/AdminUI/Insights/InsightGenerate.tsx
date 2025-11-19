@@ -114,7 +114,20 @@ export default function InsightGenerate({ alunoId, onSaved, onCancel }: InsightG
   };
 
   if (loadingData) return <p className="text-center mt-8">A carregar dados do aluno...</p>;
-  if (error) return <p className="text-center text-red-500 mt-8">Erro: {error}</p>;
+  if (error) {
+  return (
+    <div className="text-center mt-8">
+      <p className="text-red-500 mb-4">Erro: {error}</p>
+
+      <button
+        onClick={onCancel}
+        className="bg-gray-300 text-gray-700 font-semibold py-3 px-6 rounded-xl shadow-md hover:bg-gray-400 transition-colors"
+      >
+        Voltar
+      </button>
+    </div>
+  );
+}
   if (!alunoData) return <p className="text-center text-gray-500 mt-8">Aluno não encontrado.</p>;
 
   // Função utilitária para formatar o JSON 

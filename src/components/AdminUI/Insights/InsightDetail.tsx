@@ -11,6 +11,8 @@ export default function InsightDetail({ insight, onCancel }: InsightDetailProps)
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [showJson, setShowJson] = useState(false);
+
   // Exemplo de como formatar o JSON de entrada para exibição
   const formatJson = (json: any) => {
     return JSON.stringify(json, null, 2);
@@ -36,9 +38,17 @@ export default function InsightDetail({ insight, onCancel }: InsightDetailProps)
         <p className="text-sm text-gray-600 mb-4">
           Gerado em: {new Date(insight.dataGeracao).toLocaleDateString()}
         </p>
-        <pre className="bg-gray-800 text-white p-4 rounded-lg overflow-x-auto text-xs">
-          {insight.jsonInput ? formatJson(insight.jsonInput) : 'Nenhum JSON de entrada disponível.'}
-        </pre>
+        <button 
+            onClick={() => setShowJson(!showJson)}
+            className="mt-4 text-xs text-blue-600 hover:text-blue-800 transition-colors"
+        >
+            {showJson ? 'Ocultar JSON Completo' : 'Visualizar JSON Completo (Dados Brutos)'}
+        </button>
+        {showJson && (
+          <pre className="bg-gray-800 text-green-300 p-4 rounded-lg overflow-x-auto text-xs mt-3 max-h-64 whitespace-pre-wrap">
+            {insight.jsonInput ? formatJson(insight.jsonInput) : 'Nenhum JSON de entrada disponível.'}
+          </pre>
+        )}
       </div>
 
       <div>
