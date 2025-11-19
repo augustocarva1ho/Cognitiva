@@ -9,7 +9,7 @@ interface ClassCreateProps {
 }
 
 export default function ClassCreate({ onCreated, onCancel }: ClassCreateProps) {
-  const { API_BASE_URL, token } = useAuth();
+  const { API_BASE_URL, token, user, viewingSchoolId } = useAuth();
   const [nomeTurma, setNomeTurma] = useState('');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -23,15 +23,22 @@ export default function ClassCreate({ onCreated, onCancel }: ClassCreateProps) {
     
     setLoading(true);
     setMessage(null);
+    
+    //Determina o ID de escola a ser salvo: Admin usa viewingSchoolId, outros usam user.escolaId
+    const finalEscolaId = user?.acesso === 'Administrador' ? viewingSchoolId : user?.escolaId;
 
     try {
+      const payload = {
+            Nome: nomeTurma,
+            escolaId: finalEscolaId,
+        };
       const response = await fetch(`${API_BASE_URL}/api/turmas`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
-        body: JSON.stringify({ Nome: nomeTurma }),
+        body: JSON.stringify(payload),
       });
 
       const result = await response.json();
@@ -57,6 +64,8 @@ export default function ClassCreate({ onCreated, onCancel }: ClassCreateProps) {
       ? 'bg-green-100 border-green-400 text-green-700'
       : 'bg-red-100 border-red-400 text-red-700'
     : '';
+
+    const displaySchoolId = viewingSchoolId || user?.escolaId || 'N/A';
 
   return (
     <div className="w-full max-w-4xl mx-auto p-6 bg-white rounded-2xl shadow-xl mt-4">

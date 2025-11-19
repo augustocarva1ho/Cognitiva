@@ -42,7 +42,7 @@ export default function ActivitiesManager() {
     const [error, setError] = useState<string | null>(null);
     const [selectedAtividade, setSelectedAtividade] = useState<Atividade | null>(null);
 
-    const canCreateOrEdit = user?.acesso === 'Administrador' || user?.acesso === 'Supervisor';
+    const canCreateOrEdit = user?.acesso === 'Administrador' || user?.acesso === 'Supervisor' || user?.acesso === 'Professor';
 
     const fetchAtividades = useCallback(async () => {
         if (!token) {
